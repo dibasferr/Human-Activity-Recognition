@@ -49,7 +49,7 @@ def representacao_grafica(dados):
     plt.show()
         
 
-#3.2
+#3.2 So a aceleracao, faltam os outros parametros
 def outlier_density(dados):
     number=1
     for person in dados:
