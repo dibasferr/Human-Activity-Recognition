@@ -6,6 +6,8 @@ Max_Part_num=14
 dev_num=5
 activity_num=17
 
+modulos = []
+
 def descarregar_dados():
     array = []
     for i in range(0,Max_Part_num+1):
@@ -72,6 +74,8 @@ def outlier_density(dados):
                 person[condition, j+1].astype(float) **2 +
                 person[condition, j+2].astype(float) **2
                 )
+
+                modulos.append(modulo)
                 
                 Q1 = np.percentile(modulo, 25)
                 Q3 = np.percentile(modulo, 75)
@@ -87,11 +91,36 @@ def outlier_density(dados):
                     file.write("Densidade de outlier do dataset da " + str(i) + " atividade: " + str(d) +"\n")
         number+=1
 
+def z_score_test(modulos, k):
+    array = np.array(modulos, dtype=object)
+    outliers = []
+
+    for modulo in array:
+        modulo = np.array(modulo, dtype=object)
+        if len(modulo) == 0:
+            outliers.append([])
+            continue
+
+        media = np.mean(modulo)
+        desvio_padrao = np.std(modulo)
+
+        if desvio_padrao > 0:
+            z_scores = (modulo - media) / desvio_padrao
+        else:
+            np.zeros_like(modulo)
+        
+        outlier_indices = np.where(np.abs(z_scores) > k)
+        outliers.append(modulo[outlier_indices])
+
+    return outliers
 
 if __name__=="__main__":
-    dados= descarregar_dados()
-    representacao_grafica(dados)
+    dados = descarregar_dados()
+    #representacao_grafica(dados)
     outlier_density(dados)
+    print(len(modulos))
+    outliers = z_score_test(modulos, k = 2)
+    print(outliers)
                 
 #Coluna 1: Device ID
 #Coluna 2: accelerometer x
