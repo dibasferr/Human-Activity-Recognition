@@ -1,14 +1,18 @@
 import numpy as np, scipy, matplotlib.pyplot as plt
 import csv
 import math, time
+import random
+
+MAX_REPS= 42
+SWITCH_VALUE=3
 
 Max_Part_num=2
 dev_num=5
 activity_num=17
 
-ACELERACAO = 1
-GIROSCOPIO= 4
-MAGNETOMETRO=7
+ACELERACAO = 0
+GIROSCOPIO= 1
+MAGNETOMETRO=2
 
 #Uma especie de define
 FEAT= GIROSCOPIO
@@ -37,29 +41,20 @@ def descarregar_dados():
 
 #3.1
 #Arranjar uma forma de usar a funcao calculo modulo para esse plot(nao repetir codigo)
-def representacao_grafica(dados):
-    for person in dados:
-            person = np.array(person)
-            #calculo de modulo dos vetores de aceleracao
-            plt.figure()
-            for i in range(1,activity_num):
-                condition = person[:,-1] == str(i)
-                modulo = np.sqrt( person[condition, FEAT].astype(float) **2 +
-                person[condition, FEAT+1].astype(float) **2 +
-                person[condition, FEAT+2].astype(float) **2
-                )
-                #-> Fim de calculo
+def representacao_grafica(FEAT):
+    p=1
+    for person in FEATURES:
+        plt.figure(num=str(p) + "pessoa")
+        p+=1
+        modulos_atividades= person[FEAT]
+        i=1
+        for modulo in modulos_atividades:
+            plt.subplot(4,4,i)
+            plt.boxplot(modulo)
+            plt.title("Boxplot atividade " + str(i))
+            i+=1
 
-                # Nota: o cálculo do módulo dos vetores foi implementado manualmente (x² + y² + z²)^(1/2).
-                # Alternativamente, poderíamos usar a função np.linalg.norm(person[condition, 1:4], axis=1). 
-                # No entanto, optou-se pela versão manual por ser ligeiramente mais direta e com desempenho equivalente.
-
-                plt.subplot(4,4,i)
-                plt.boxplot(modulo)
-                plt.title("Boxplot atividade " + str(i))
-                
-    plt.show()
-        
+    plt.show()      
 
 
 #funcao auxiliar    
@@ -86,9 +81,10 @@ def calculo_modulo(dados):
             aux1.append(aux)      
         
         FEATURES.append(aux1)  
-    
-    print(len(FEATURES[0][0]))        
-        
+            
+    # Nota: o cálculo do módulo dos vetores foi implementado manualmente (x² + y² + z²)^(1/2).
+    # Alternativamente, poderíamos usar a função np.linalg.norm(person[condition, 1:4], axis=1). 
+    # No entanto, optou-se pela versão manual por ser ligeiramente mais direta e com desempenho equivalente.   
                             
            
                 
@@ -134,7 +130,7 @@ def outlier_density(dados):
         number+=1
 
 
-
+#3.4
 def z_score_test(modulos, k):
     outliers = []
     i=1
@@ -164,26 +160,7 @@ def z_score_test(modulos, k):
         i+=1
     
     
-
-#calcular o modulo diretamente no nos dados de person(x,y,z). Se for uma linha outlier, guardar logo a posicao da linha no array daquela pessoa para indicar que aquela linha é um outlier. No final,usar esses indices para dizer que aquelas linhas sao outlier num plot tridimensional
-#cada pessoa tem 3 plots, acel, girosc, megn
-#se cada pessoa tiver 3, cada um vai ter coordenadas de uma atividade atividade(considerada outlier no grupo de sua atividade). Ou seja em vez de guardar modulo é melhor guardar posicoes
-
-#ou usar um plot bidimensional(indice modulo outlier, valor modulo) no array de modulos
-#pode misturar os 16 arrays num so e fazer isso -> 3 plots por pessoa
-if __name__=="__main__":
-    dados= descarregar_dados()
-    
-    #representacao_grafica(dados)
-    
-    #outlier_density(dados)
-    
-    calculo_modulo(dados) 
-      
-    FEATURES= np.array(FEATURES)
-    
-    K=3
-
+def plot_zscore(K):
     for i in range (0, len(FEATURES)):
         for j in range (0, len(FEATURES[i])):
             
@@ -193,6 +170,113 @@ if __name__=="__main__":
             
             Outliers_index= z_score_test( FEATURES[i][j] , K )
     plt.show()    
+
+#calcular centroides
+
+def K_means(N, device):
+    #device deve ser a coluna da coordenada x do tipo de dispositivo
+    
+    #Para os clusters, faz mais sentido repartir o array em n clusters, em vez de escolher aleatoriamente n centroides. 
+    # Escolhendo N centroides random, sou capaz de escolher um centroide outlier e ele agrupar todos os outros outliers.
+    #Daí, a distancia ao centroide pode nao ser muito superior ao treshold, nao identificando assim o outlier
+
+    for person in dados: # a variavel organiza os dados de seguinte forma: [ [], [], [], [] ... , []] em que cada entrada sao os dados de todos os sensores de um individuo
+        pessoa= np.array(person)
+        
+        fig, axes = plt.subplots(4,4, subplot_kw={'projection':'3d'})
+        for i in range (1, activity_num):
+
+            dados_a_tratar= pessoa [ pessoa[:,-1] == str(i) ] # ultima pos é activity_id
+            
+            dados_a_tratar = dados_a_tratar[:,device:device+3].astype(float)
+            centroides= []
+            pos=0 #posicao do ponterio copia
+            
+
+            step=int(len(dados_a_tratar)/N)
+           
+            for j in range(0,N):
+                
+                if j ==N-1 :  cluster= dados_a_tratar[pos:] #Assegurar que nao sao ultrapasados os limites do array  
+                else: 
+                    cluster= dados_a_tratar[pos:pos+step,:]
+                    pos= pos+step
+                
+                centroides.append(np.median(cluster, axis=0)) # Calculo de centroides desta forma para garantir a nao escolha de outlier como centroide
+
+            track=1 #monitora o numero de iterações
+            flag=1 #houve mudança nos clusters
+            
+            group= np.zeros(len(dados_a_tratar), dtype=int) # array q define o grupo q cada ponto pertence
+            centroides = np.array(centroides)
+            
+           #calculo de clusters
+            while((track <= MAX_REPS) and (flag==1) ):
+                
+                track+=1 # Mais uma iteracao
+                flag=0
+                
+                dist = np.linalg.norm(dados_a_tratar[:, np.newaxis, :] - centroides[np.newaxis, :, :], axis=2)
+            
+                for j in range(0,len(dados_a_tratar)):
+                    recent_group= np.argmin(dist[j]) # o cluster a q pertence
+                   
+                    if(group[j] != recent_group):
+                        group[j] = recent_group
+                
+                for j in range(0,N):
+                    aux= dados_a_tratar[group==j]
+                    new_center= np.median(aux, axis=0)
+                    if(np.linalg.norm(new_center-centroides[j]) > SWITCH_VALUE ):
+                        centroides[j] = new_center
+                        flag=1
+            
+            colors= []
+            dados_transf=[]
+            for j in range(0,N):
+                aux= dados_a_tratar[group==j]
+                
+                if(len(aux)==0) : continue
+                dados_transf.append(aux)
+                dist = np.linalg.norm(aux - centroides[j], axis=1)
+                
+                threshold = np.percentile(dist, 95)
+                color= np.where(np.linalg.norm(aux-centroides[j], axis=1) > threshold, 'r', 'b')
+                colors.extend(color)
+            
+            
+            axes = axes.flatten()
+
+            ax = axes[i-1]
+            dados_transf= np.vstack(dados_transf)
+            ax.scatter(dados_transf[:,0],dados_transf[:,1],dados_transf[:,2],c= colors)
+                
+            plt.tight_layout()     
+    plt.show()
+               
+            
+
+
+
+if __name__=="__main__":
+    dados= descarregar_dados()
+    
+    #calculo_modulo(dados)
+    
+    #representacao_grafica(FEAT)
+    
+    #outlier_density(dados)
+     
+      
+    #FEATURES= np.array(FEATURES)
+    
+    K=3
+
+   # plot_zscore(K)
+    
+    N=5
+    K_means(N,4) #4 significa que estamos a analisar so o giroscopio relativamente a todas as atividades
+    
 #Coluna 1: Device ID
 #Coluna 2: accelerometer x
 #Coluna 3: accelerometer y
