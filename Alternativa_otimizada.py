@@ -111,7 +111,6 @@ def outlier_density(dados):
                 person[condition, j+2].astype(float) **2
                 )
                 
-                FEATURES.append(modulo)
                 
                 
                 Q1 = np.percentile(modulo, 25)
@@ -261,18 +260,18 @@ def K_means(N, device):
 if __name__=="__main__":
     dados= descarregar_dados()
     
-    #calculo_modulo(dados)
+    calculo_modulo(dados)
     
     #representacao_grafica(FEAT)
     
     #outlier_density(dados)
      
       
-    #FEATURES= np.array(FEATURES)
+    FEATURES= np.array(FEATURES)
     
     K=3
 
-   # plot_zscore(K)
+    plot_zscore(K)
     
     N=5
     K_means(N,4) #4 significa que estamos a analisar so o giroscopio relativamente a todas as atividades
