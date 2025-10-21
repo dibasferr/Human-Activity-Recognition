@@ -2,6 +2,8 @@ import numpy as np, scipy, matplotlib.pyplot as plt
 import csv
 import math, time
 import random
+from scipy import stats
+from scipy.stats import kstest, norm
 
 MAX_REPS= 42
 SWITCH_VALUE=3
@@ -216,10 +218,163 @@ def K_means(N, device):
                 
         plt.tight_layout()     
     plt.show()
-               
+    
+    
+    #4.1
+def sig_est(modulos):
+    # Junta os arrays equivalentes (por posição)
+    # considerando que a estrutura dos modulos é 3x16
+    norm=1 # 1 se forem todos normais. 0 se pelo menos 1 for nao normal
+    aux= ["Acelerometro", "Grioscopio", "Magnetometro"]
+    a=0
+    for sensor in modulos:
+        print(aux[a]+"\n")
+        a+=1
+        #Analise de normalidade para cada sensor
+        for i in range(1, activity_num):
+            ks_stat, p_norm = kstest(sensor[i], 'norm', args=(np.mean(sensor[i]), np.std(sensor[i])))
+            if p_norm <=0.05 : 
+                norm=0
+                break
+            
+        if norm == 0:
+            # Teste de Kruskal-Wallis
+            h_stat, p_value = stats.kruskal(*sensor)
+            metodo = "Kruskal–Wallis (não paramétrico)"
+        else:
+            f_stat, p_value = stats.f_oneway(*sensor)
+            metodo = "ANOVA (paramétrico)"
+            
+        print(f"→ Teste usado: {metodo}")
+        if p_value < 0.05:
+            print("Rejeitamos H₀: existem diferenças significativas entre as atividades.\n\n")
+        else:
+            print("Não rejeitamos H₀: as médias não diferem significativamente.\n\n")
+            
+
+
+# ChatGPT
+
+# 1. Mean
+def feature_mean(window):
+    return np.mean(window)
+
+# 2. Median
+def feature_median(window):
+    return np.median(window)
+
+# 3. Standard Deviation
+def feature_std(window):
+    return np.std(window)
+
+# 4. Variance
+def feature_variance(window):
+    return np.var(window)
+
+# 5. Root Mean Square (RMS)
+def feature_rms(window):
+    return np.sqrt(np.mean(window**2))
+
+# 6. Averaged Derivatives (mean of first derivative)
+def feature_avg_derivative(window):
+    deriv = np.diff(window)
+    return np.mean(deriv)
+
+# 7. Skewness
+def feature_skewness(window):
+    return stats.skew(window)
+
+# 8. Kurtosis
+def feature_kurtosis(window):
+    return stats.kurtosis(window)
+
+# 9. Interquartile Range (IQR)
+def feature_iqr(window):
+    return np.percentile(window, 75) - np.percentile(window, 25)
+
+# 10. Zero Crossing Rate (ZCR)
+def feature_zero_crossing_rate(window):
+    zc = ((window[:-1] * window[1:]) < 0).sum()
+    return zc / len(window)
+
+# 11. Mean Crossing Rate (MCR)
+def feature_mean_crossing_rate(window):
+    mean_val = np.mean(window)
+    crossings = ((window[:-1] - mean_val) * (window[1:] - mean_val) < 0).sum()
+    return crossings / len(window)
+
+
+# 12. Spectral Entropy
+def feature_spectral_entropy(window):
+    # FFT
+    fft_vals = np.fft.fft(window)
+    psd = np.abs(fft_vals)**2
+    psd_norm = psd / np.sum(psd)
+    psd_norm = psd_norm[psd_norm > 0]  # evitar log(0)
+    return -np.sum(psd_norm * np.log2(psd_norm))
+
+#ChatGPT end
+
+
+
+#4.2
+def features_extract(modulos):
+    # Cálculo da frequência de amostragem
+    timestamps = np.array(dados[:, -2], dtype=float) # Todas as linhas da penúltima coluna
+    diffs = np.diff(timestamps)
+    dt_ms = np.mean(diffs) 
+    dt_s = dt_ms / 1000
+    fs = 1 / dt_s
+    print(f"Frequência de amostragem: {fs:.2f} Hz")
+        
+    vetor_features = []
+    
+    # Tamanho da janela 5 segundos
+    window_size= int(fs * 5)
+    overlap=0.5
+    step = int(window_size * (1 - overlap))
+        
+    for sensor in modulos:
+        #Por sensor(acelerometro, giroscopio, magnetometro)
+        
+        todas_janelas = []
+        print(len(sensor))
+        for i in range(len(sensor)):
+            todas_janelas.extend(sensor[i])
+            todas_janelas.append(100)  #100 significa que é o fim de uma atividade
+            
+        win_num=0
+        for i in range( 0, len(todas_janelas) - window_size + 1 , step ):
+            window = todas_janelas[i : i + window_size]
+            
+            window= np.array(window)
+            
+            # Descartar janelas com mistura de atividades
+            if(100 in window):
+                continue
+            
+            win_num += 1
+            aux=[]
+            aux.append(feature_mean(window))
+            aux.append(feature_median(window))
+            aux.append(feature_std(window))
+            aux.append(feature_variance(window))
+            aux.append(feature_rms(window))
+            aux.append(feature_avg_derivative(window))
+            aux.append(feature_skewness(window))
+            aux.append(feature_kurtosis(window))
+            aux.append(feature_iqr(window))
+            aux.append(feature_zero_crossing_rate(window))
+            aux.append(feature_mean_crossing_rate(window))
+            aux.append(feature_spectral_entropy(window))
+            
+            vetor_features.append(aux)
+            
+    return vetor_features
+              
 
 if __name__=="__main__":
-    dados= descarregar_dados()
+    dados = descarregar_dados()
     
     calculo_modulo(dados)
     
@@ -235,7 +390,12 @@ if __name__=="__main__":
     #plot_zscore(K)
     
     N=5
-    K_means(N,4) #4 significa que estamos a analisar so o giroscopio relativamente a todas as atividades
+    #K_means(N,4) #4 significa que estamos a analisar so o giroscopio relativamente a todas as atividades
+    
+    #sig_est(FEATURES)
+    
+    vetor_features = features_extract(FEATURES)
+    
 
 #Coluna 1: Device ID
 #Coluna 2: accelerometer x
