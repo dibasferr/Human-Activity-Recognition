@@ -4,6 +4,8 @@ import math, time
 import random
 from scipy import stats
 from scipy.stats import kstest, norm
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 MAX_REPS= 42
 SWITCH_VALUE=3
@@ -338,7 +340,6 @@ def features_extract(modulos):
         #Por sensor(acelerometro, giroscopio, magnetometro)
         
         todas_janelas = []
-        print(len(sensor))
         for i in range(len(sensor)):
             todas_janelas.extend(sensor[i])
             todas_janelas.append(100)  #100 significa que é o fim de uma atividade
@@ -371,6 +372,44 @@ def features_extract(modulos):
             vetor_features.append(aux)
             
     return vetor_features
+
+def aplicar_pca(features):
+    # Normalização (z-score)
+    scaler = StandardScaler() # Função do scikit-learn que realiza o z-score
+    X_scaled = scaler.fit_transform(features)
+    
+    # PCA
+    # Funcionamento básico do PCA:
+    # Cria novos eixos (componentes principais) no espaço das features.
+    # Cada novo eixo é uma combinação linear das features originais que maximiza a variância dos dados ao longo dele.
+    # O primeiro vetor principal (PC1) é o eixo que captura a maior parte da variância dos dados.
+    # O segundo vetor principal (PC2) é perpendicular ao primeiro e captura a maior parte da variância restante, e assim por diante.
+    
+    pca = PCA()
+    pca.fit_transform(X_scaled)
+    
+    var_exp = pca.explained_variance_ratio_ # Indica quanto cada componente explica da variância total
+    cum_var_exp = np.cumsum(var_exp)
+
+    print("Variância explicada por componente:", var_exp)
+    print("Variância acumulada:", cum_var_exp)
+
+    # índice da primeira vez que a variância acumulada >= 0.75
+    num_dim_75 = np.argmax(cum_var_exp >= 0.75) + 1
+    print("Número de dimensões necessárias para 75% da variância:", num_dim_75)
+    
+    # Projetando os dados originais nas 'num_dim_75' primeiras componentes
+    pca_reduced = PCA(n_components=num_dim_75)
+    X_reduced = pca_reduced.fit_transform(X_scaled)
+
+    # Exemplo: pegar features reduzidas da primeira amostra
+    sample_index = 0
+    print("Features reduzidas da primeira amostra:", X_reduced[sample_index])
+
+    # Essa abordagem é vantajosa pois reduz a dimensão dos dados, facilitando análise e visualização.
+    # Remove redundância entre features correlacionadas, e ainda mantém a maior parte da informação (variância).
+    # Tem limitações, pois como o PCA assume linearidade padrões não lineares podem ser perdidos.
+    # Há perda de informações, mesmo com 75% da variância os 25% ainda se perdem (são descartados).
               
 
 if __name__=="__main__":
@@ -395,6 +434,9 @@ if __name__=="__main__":
     #sig_est(FEATURES)
     
     vetor_features = features_extract(FEATURES)
+    vetor_features = np.array(vetor_features, dtype=object)
+    
+    aplicar_pca(vetor_features)
     
 
 #Coluna 1: Device ID
