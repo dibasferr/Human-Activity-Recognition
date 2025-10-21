@@ -142,7 +142,6 @@ def plot_zscore(K):
             z_score_test(FEATURES[i] , K )
     plt.show()    
 
-#calcular centroides
 
 def K_means(N, device):
     #device deve ser a coluna da coordenada x do tipo de dispositivo
@@ -151,7 +150,8 @@ def K_means(N, device):
     # Escolhendo N centroides random, sou capaz de escolher um centroide outlier e ele agrupar todos os outros outliers.
     # Daí, a distancia ao centroide pode nao ser muito superior ao treshold, nao identificando assim o outlier
         
-    fig, axes = plt.subplots(4,4, subplot_kw={'projection':'3d'})
+    colors= []
+    dados_transf=[]
     for i in range (1, activity_num):
 
         dados_a_tratar= dados [ dados[:,-1] == str(i) ] # ultima pos é activity_id
@@ -198,8 +198,7 @@ def K_means(N, device):
                     centroides[j] = new_center
                     flag=1
             
-        colors= []
-        dados_transf=[]
+        
         for j in range(0,N):
             aux= dados_a_tratar[group==j]
                 
@@ -211,16 +210,16 @@ def K_means(N, device):
             color= np.where(np.linalg.norm(aux-centroides[j], axis=1) > threshold, 'r', 'b')
             colors.extend(color)
             
-            
-        axes = axes.flatten()
+        
+    dados_transf= np.vstack(dados_transf)
 
-        ax = axes[i-1]
-        dados_transf= np.vstack(dados_transf)
-        ax.scatter(dados_transf[:,0],dados_transf[:,1],dados_transf[:,2],c= colors)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(dados_transf[:,0],dados_transf[:,1],dados_transf[:,2],c= colors)
                 
-        plt.tight_layout()     
+    plt.tight_layout()     
     plt.show()
-    
+     
     
     #4.1
 def sig_est(modulos):
@@ -451,3 +450,9 @@ if __name__=="__main__":
 #Coluna 10: magnetometer z
 #Coluna 11: Timestamp
 #Coluna 12: Activity Label
+
+
+
+
+
+ 
