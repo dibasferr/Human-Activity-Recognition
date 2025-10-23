@@ -39,17 +39,17 @@ def descarregar_dados():
 
 
 #3.1
-#Arranjar uma forma de usar a funcao calculo modulo para esse plot(nao repetir codigo)
-def representacao_grafica(FEAT):
-    modulos_atividades= FEATURES[FEAT]
+def representacao_grafica():
+    modulos_atividades= FEATURES # [FEAT]
+    nomes_variaveis = ["Aceleração", "Giroscópio", "Magnetómetro"]
     i=1
+    print(len(modulos_atividades))
     for modulo in modulos_atividades:
-        plt.subplot(4,4,i)
         plt.boxplot(modulo)
-        plt.title("Boxplot atividade " + str(i))
+        plt.title("Boxplot atividade " + nomes_variaveis[i-1])
         i+=1
-
-    plt.show()      
+        plt.tight_layout()
+        plt.show()       
 
 
 #funcao auxiliar    
@@ -125,7 +125,7 @@ def z_score_test(modulos, k):
         
         colors=np.array(['b']*len(modulo))
         colors[outlier_indices]= 'r'
-        plt.subplot(4,4,i)
+        plt.subplot(1,16,i)
         
         plt.scatter(np.linspace(0, len(modulo) , len(modulo)) , modulo, c=colors)
         plt.title("Boxplot atividade " + str(i))
