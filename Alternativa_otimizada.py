@@ -6,11 +6,12 @@ from scipy import stats
 from scipy.stats import kstest, norm
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import NearestNeighbors
 
 MAX_REPS= 42
 SWITCH_VALUE=3
 
-Max_Part_num=14
+Max_Part_num=2
 dev_num=5
 activity_num=17
 
@@ -23,6 +24,8 @@ FEAT= GIROSCOPIO
 
 FEATURES= []
 
+
+#2
 def descarregar_dados():
     array = []
     for i in range(0,Max_Part_num+1):
@@ -39,6 +42,7 @@ def descarregar_dados():
 
 
 #3.1
+#Arranjar uma forma de usar a funcao calculo modulo para esse plot(nao repetir codigo)
 def representacao_grafica():
     modulos_atividades= FEATURES # [FEAT]
     nomes_variaveis = ["Aceleração", "Giroscópio", "Magnetómetro"]
@@ -49,7 +53,7 @@ def representacao_grafica():
         plt.title("Boxplot atividade " + nomes_variaveis[i-1])
         i+=1
         plt.tight_layout()
-        plt.show()       
+        plt.show()      
 
 
 #funcao auxiliar    
@@ -64,7 +68,6 @@ def calculo_modulo(dados):
             dados[condition, j+1].astype(float) **2 +
             dados[condition, j+2].astype(float) **2
             )
-            #usar z_score aqui para determinar indices dos outliers e fazer um reverse para determinar a linha correspondente nos dados iniciais
             aux.append(modulo)    
         FEATURES.append(aux) 
             
@@ -105,7 +108,7 @@ def outlier_density(dados):
             with open("Density_file",'a+') as file:
                 file.write("Densidade de outlier do dataset da " + str(i) + " atividade: " + str(d) +"\n")
 
-#3.4
+#3.3 e 3.4
 def z_score_test(modulos, k):
     outliers = []
     i=1
@@ -142,8 +145,11 @@ def plot_zscore(K):
             z_score_test(FEATURES[i] , K )
     plt.show()    
 
+#calcular centroides
 
-def K_means(N, device):
+
+#3.6 e 3.7
+def k_means(N):
     #device deve ser a coluna da coordenada x do tipo de dispositivo
     
     # Para os clusters, faz mais sentido repartir o array em n clusters, em vez de escolher aleatoriamente n centroides. 
@@ -153,75 +159,96 @@ def K_means(N, device):
     colors= []
     dados_transf=[]
     for i in range (1, activity_num):
-
-        dados_a_tratar= dados [ dados[:,-1] == str(i) ] # ultima pos é activity_id
-            
-        dados_a_tratar = dados_a_tratar[:,device:device+3].astype(float)
-        centroides= []
-        pos=0 #posicao do ponterio copia
-            
-        step=int(len(dados_a_tratar)/N)
-           
-        for j in range(0,N):
-                
-            if j == N-1 :  cluster= dados_a_tratar[pos:] #Assegurar que nao sao ultrapasados os limites do array  
-            else: 
-                cluster= dados_a_tratar[pos:pos+step,:]
-                pos= pos+step
-                
-            centroides.append(np.median(cluster, axis=0)) # Calculo de centroides desta forma para garantir a nao escolha de outlier como centroide
-
-        track=1 #monitora o numero de iterações
-        flag=1 #houve mudança nos clusters
-            
-        group= np.zeros(len(dados_a_tratar), dtype=int) # array q define o grupo q cada ponto pertence
-        centroides = np.array(centroides)
-            
-        #calculo de clusters
-        while((track <= MAX_REPS) and (flag==1) ):
-                
-            track+=1 # Mais uma iteracao
-            flag=0
-                
-            dist = np.linalg.norm(dados_a_tratar[:, np.newaxis, :] - centroides[np.newaxis, :, :], axis=2)
-            
-            for j in range(0,len(dados_a_tratar)):
-                recent_group= np.argmin(dist[j]) # o cluster a q pertence
-                   
-                if(group[j] != recent_group):
-                    group[j] = recent_group
-                
-            for j in range(0,N):
-                aux= dados_a_tratar[group==j]
-                new_center= np.median(aux, axis=0)
-                if(np.linalg.norm(new_center-centroides[j]) > SWITCH_VALUE ):
-                    centroides[j] = new_center
-                    flag=1
-            
         
-        for j in range(0,N):
-            aux= dados_a_tratar[group==j]
-                
-            if(len(aux)==0) : continue
-            dados_transf.append(aux)
-            dist = np.linalg.norm(aux - centroides[j], axis=1)
-                
-            threshold = np.percentile(dist, 95)
-            color= np.where(np.linalg.norm(aux-centroides[j], axis=1) > threshold, 'r', 'b')
-            colors.extend(color)
-            
+        dados_a_tratar= np.array(FEATURES[:,i-1])
+        dados_a_tratar= np.vstack(dados_a_tratar)
+        dados_a_tratar= dados_a_tratar.T
+        dados_transf.append(dados_a_tratar)
         
-    dados_transf= np.vstack(dados_transf)
+        
+    
+    centroides= []
+    pos=0 #posicao do ponterio copia
+    dados_transf=np.array(dados_transf)
+    dados_transf=np.vstack(dados_transf)
+    
+    
+    media = np.mean(dados_transf, axis=0)
+    desvio = np.std(dados_transf, axis=0)
+    dados_transf = (dados_transf - media) / desvio #normalização de dados_trans pelo z_score
+    
+    
+    step=int(len(dados_transf)/N)
+        
+    for j in range(0,N):
+            
+        if j == N-1 :  cluster= dados_transf[pos:] #Assegurar que nao sao ultrapasados os limites do array  
+        else: 
+            cluster= dados_transf[pos:pos+step,:]
+            pos= pos+step
+            
+        centroides.append(np.median(cluster, axis=0)) # Calculo de centroides desta forma para garantir a nao escolha de outlier como centroide
 
+    track=1 #monitora o numero de iterações
+    flag=1 #houve mudança nos clusters
+        
+    group= np.zeros(len(dados_transf), dtype=int) # array q define o grupo q cada ponto pertence
+    centroides = np.array(centroides)
+        
+    #calculo de clusters
+    while((track <= MAX_REPS) and (flag==1) ):
+            
+        track+=1 # Mais uma iteracao
+        flag=0
+            
+        dist = np.linalg.norm(dados_transf[:, np.newaxis, :] - centroides[np.newaxis, :, :], axis=2)
+        
+        for j in range(0,len(dados_transf)):
+            recent_group= np.argmin(dist[j]) # o cluster a q pertence
+                
+            if(group[j] != recent_group):
+                group[j] = recent_group
+            
+        for j in range(0,N):
+            aux= dados_transf[group==j]
+            new_center= np.median(aux, axis=0)
+            if(np.linalg.norm(new_center-centroides[j]) > SWITCH_VALUE ):
+                centroides[j] = new_center
+                flag=1
+        
+    resultos=[]
+    for j in range(0,N):
+        aux= dados_transf[group==j]
+            
+        if(len(aux)==0) : continue
+        resultos.append(aux)
+        dist = np.linalg.norm(aux - centroides[j], axis=1)
+            
+        Q1 = np.percentile(dist, 25)
+        Q3 = np.percentile(dist, 75)
+            
+        IQR = Q3 - Q1
+        lower_lim = Q1 - 1.5 * IQR
+        upper_lim = Q3 + 1.5 * IQR
+        
+        dist = np.linalg.norm(aux - centroides[j], axis=1)
+        color = np.where((dist > upper_lim) | (dist < lower_lim), 'r', 'b')
+        
+        colors.extend(color)
+        
+        
+    resultos=np.vstack(resultos)
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(dados_transf[:,0],dados_transf[:,1],dados_transf[:,2],c= colors)
+    limite= int(len(resultos)/2) #diminuir em metade o numero de pontos. Como eles estao distrbuidos aleatoriamente, a probabilidade de aparecer um outlier
+    #na primeira metade ou na outra é igual. Entao o plot representada, com dados reduzidos, a imagem esperada
+    ax.scatter(resultos[0:limite,0],resultos[0:limite,1],resultos[0:limite,2],c= colors[0:limite])
                 
     plt.tight_layout()     
     plt.show()
      
     
-    #4.1
+#4.1
 def sig_est(modulos):
     # Junta os arrays equivalentes (por posição)
     # considerando que a estrutura dos modulos é 3x16
@@ -254,128 +281,185 @@ def sig_est(modulos):
             
 
 
-# ChatGPT
+#ChatGPT
 
 # 1. Mean
-def feature_mean(window):
-    return np.mean(window)
+def feature_mean(mod1, mod2, mod3):
+    return [np.mean(mod1), np.mean(mod2), np.mean(mod3)]
 
 # 2. Median
-def feature_median(window):
-    return np.median(window)
+def feature_median(mod1, mod2, mod3):
+    return [np.median(mod1), np.median(mod2), np.median(mod3)]
 
 # 3. Standard Deviation
-def feature_std(window):
-    return np.std(window)
+def feature_std(mod1, mod2, mod3):
+    return [np.std(mod1), np.std(mod2), np.std(mod3)]
 
 # 4. Variance
-def feature_variance(window):
-    return np.var(window)
+def feature_variance(mod1, mod2, mod3):
+    return [np.var(mod1), np.var(mod2), np.var(mod3)]
 
 # 5. Root Mean Square (RMS)
-def feature_rms(window):
-    return np.sqrt(np.mean(window**2))
+def feature_rms(mod1, mod2, mod3):
+    return [np.sqrt(np.mean(mod1**2)),
+            np.sqrt(np.mean(mod2**2)),
+            np.sqrt(np.mean(mod3**2))]
 
 # 6. Averaged Derivatives (mean of first derivative)
-def feature_avg_derivative(window):
-    deriv = np.diff(window)
-    return np.mean(deriv)
+def feature_avg_derivative(mod1, mod2, mod3):
+    return [np.mean(np.diff(mod1)),
+            np.mean(np.diff(mod2)),
+            np.mean(np.diff(mod3))]
 
 # 7. Skewness
-def feature_skewness(window):
-    return stats.skew(window)
+def feature_skewness(mod1, mod2, mod3):
+    return [stats.skew(mod1),
+            stats.skew(mod2),
+            stats.skew(mod3)]
 
 # 8. Kurtosis
-def feature_kurtosis(window):
-    return stats.kurtosis(window)
+def feature_kurtosis(mod1, mod2, mod3):
+    return [stats.kurtosis(mod1),
+            stats.kurtosis(mod2),
+            stats.kurtosis(mod3)]
 
 # 9. Interquartile Range (IQR)
-def feature_iqr(window):
-    return np.percentile(window, 75) - np.percentile(window, 25)
+def feature_iqr(mod1, mod2, mod3):
+    return [np.percentile(mod1, 75) - np.percentile(mod1, 25),
+            np.percentile(mod2, 75) - np.percentile(mod2, 25),
+            np.percentile(mod3, 75) - np.percentile(mod3, 25)]
 
 # 10. Zero Crossing Rate (ZCR)
-def feature_zero_crossing_rate(window):
-    zc = ((window[:-1] * window[1:]) < 0).sum()
-    return zc / len(window)
+def feature_zero_crossing_rate(mod1, mod2, mod3):
+    zc1 = ((mod1[:-1] * mod1[1:]) < 0).sum() / len(mod1)
+    zc2 = ((mod2[:-1] * mod2[1:]) < 0).sum() / len(mod2)
+    zc3 = ((mod3[:-1] * mod3[1:]) < 0).sum() / len(mod3)
+    return [zc1, zc2, zc3]
 
 # 11. Mean Crossing Rate (MCR)
-def feature_mean_crossing_rate(window):
-    mean_val = np.mean(window)
-    crossings = ((window[:-1] - mean_val) * (window[1:] - mean_val) < 0).sum()
-    return crossings / len(window)
-
+def feature_mean_crossing_rate(mod1, mod2, mod3):
+    mean1 = np.mean(mod1)
+    mean2 = np.mean(mod2)
+    mean3 = np.mean(mod3)
+    mcr1 = ((mod1[:-1] - mean1) * (mod1[1:] - mean1) < 0).sum() / len(mod1)
+    mcr2 = ((mod2[:-1] - mean2) * (mod2[1:] - mean2) < 0).sum() / len(mod2)
+    mcr3 = ((mod3[:-1] - mean3) * (mod3[1:] - mean3) < 0).sum() / len(mod3)
+    return [mcr1, mcr2, mcr3]
 
 # 12. Spectral Entropy
-def feature_spectral_entropy(window):
-    # FFT
-    fft_vals = np.fft.fft(window)
-    psd = np.abs(fft_vals)**2
-    psd_norm = psd / np.sum(psd)
-    psd_norm = psd_norm[psd_norm > 0]  # evitar log(0)
-    return -np.sum(psd_norm * np.log2(psd_norm))
+def feature_spectral_entropy(mod1, mod2, mod3):
+    def entropy(window):
+        fft_vals = np.fft.fft(window)
+        psd = np.abs(fft_vals)**2
+        psd_norm = psd / np.sum(psd)
+        psd_norm = psd_norm[psd_norm > 0]
+        return -np.sum(psd_norm * np.log2(psd_norm))
+    
+    return [entropy(mod1), entropy(mod2), entropy(mod3)]
 
 #ChatGPT end
 
 
-
 #4.2
-def features_extract(modulos):
-    # Cálculo da frequência de amostragem
-    timestamps = np.array(dados[:, -2], dtype=float) # Todas as linhas da penúltima coluna
-    diffs = np.diff(timestamps)
-    dt_ms = np.mean(diffs) 
-    dt_s = dt_ms / 1000
-    fs = 1 / dt_s
-    print(f"Frequência de amostragem: {fs:.2f} Hz")
+def feature_extraction(dados):
+    dados=dados.astype(float)
+    resultado=[]
+    #Utilizados para navegar a estrutura de dados
+    pos_inicial=0
+    pos_final=pos_inicial
+    flag_final=False
+    while(True):
         
-    vetor_features = []
-    
-    # Tamanho da janela 5 segundos
-    window_size= int(fs * 5)
-    overlap=0.5
-    step = int(window_size * (1 - overlap))
-        
-    for sensor in modulos:
-        #Por sensor(acelerometro, giroscopio, magnetometro)
-        
-        todas_janelas = []
-        for i in range(len(sensor)):
-            todas_janelas.extend(sensor[i])
-            todas_janelas.append(100)  #100 significa que é o fim de uma atividade
-            
-        win_num=0
-        for i in range( 0, len(todas_janelas) - window_size + 1 , step ):
-            window = todas_janelas[i : i + window_size]
-            
-            window= np.array(window)
-            
-            # Descartar janelas com mistura de atividades
-            if(100 in window):
-                continue
-            
-            win_num += 1
-            aux=[]
-            aux.append(feature_mean(window))
-            aux.append(feature_median(window))
-            aux.append(feature_std(window))
-            aux.append(feature_variance(window))
-            aux.append(feature_rms(window))
-            aux.append(feature_avg_derivative(window))
-            aux.append(feature_skewness(window))
-            aux.append(feature_kurtosis(window))
-            aux.append(feature_iqr(window))
-            aux.append(feature_zero_crossing_rate(window))
-            aux.append(feature_mean_crossing_rate(window))
-            aux.append(feature_spectral_entropy(window))
-            
-            vetor_features.append(aux)
-            
-    return vetor_features
+        ts_window = dados[pos_inicial:, :]
 
-def aplicar_pca(features):
+        # Encontrar o índice relativo do primeiro elemento que excede o intervalo
+        relative_indices = np.where(ts_window - dados[pos_inicial] >= 5000)[0]
+
+        if relative_indices.size > 0:
+            pos_final = pos_inicial + relative_indices[0]
+        else:
+            # Caso não encontre nenhum timestamp >= 5000
+            pos_final = len(dados) - 1
+            flag_final = True
+        
+        acc = dados[pos_inicial:pos_final, 1:4]  # acelerômetro
+        gyro = dados[pos_inicial:pos_final, 4:7] # giroscópio
+        mag = dados[pos_inicial:pos_final, 7:10] # magnetômetro
+
+        pos_inicial+= (pos_final-pos_inicial)//2
+        
+        # Calcular módulo de cada vetor
+        mod_acc = np.linalg.norm(acc, axis=1)
+        mod_gyro = np.linalg.norm(gyro, axis=1)
+        mod_mag = np.linalg.norm(mag, axis=1)
+        
+        #Chamar as funcoes de calculos
+        #Na ultima posicao de cada linha está o tipo de atividade
+        # 1. Mean
+        mean_feat = feature_mean(mod_acc, mod_gyro, mod_mag)
+
+        # 2. Median
+        median_feat = feature_median(mod_acc, mod_gyro, mod_mag)
+
+        # 3. Standard Deviation
+        std_feat = feature_std(mod_acc, mod_gyro, mod_mag)
+
+        # 4. Variance
+        var_feat = feature_variance(mod_acc, mod_gyro, mod_mag)
+
+        # 5. Root Mean Square (RMS)
+        rms_feat = feature_rms(mod_acc, mod_gyro, mod_mag)
+
+        # 6. Averaged Derivatives
+        avg_deriv_feat = feature_avg_derivative(mod_acc, mod_gyro, mod_mag)
+
+        # 7. Skewness
+        skew_feat = feature_skewness(mod_acc, mod_gyro, mod_mag)
+
+        # 8. Kurtosis
+        kurt_feat = feature_kurtosis(mod_acc, mod_gyro, mod_mag)
+
+        # 9. Interquartile Range (IQR)
+        iqr_feat = feature_iqr(mod_acc, mod_gyro, mod_mag)
+
+        # 10. Zero Crossing Rate (ZCR)
+        zcr_feat = feature_zero_crossing_rate(mod_acc, mod_gyro, mod_mag)
+
+        # 11. Mean Crossing Rate (MCR)
+        mcr_feat = feature_mean_crossing_rate(mod_acc, mod_gyro, mod_mag)
+
+        # 12. Spectral Entropy
+        entropy_feat = feature_spectral_entropy(mod_acc, mod_gyro, mod_mag)
+        
+        segmento = (
+            mean_feat + 
+            median_feat + 
+            std_feat + 
+            var_feat + 
+            rms_feat + 
+            avg_deriv_feat + 
+            skew_feat + 
+            kurt_feat + 
+            iqr_feat + 
+            zcr_feat + 
+            mcr_feat + 
+            entropy_feat +
+            [int(dados[pos_inicial,-1])]
+        )
+        resultado.append(segmento)
+        if(flag_final): break
+        
+    return np.array(resultado, dtype=object)
+
+
+#4.3 e 4.4
+def aplicar_pca(estrutura):
+    features = np.array(estrutura[:, :-1], dtype=float) # elimina coluna de classes (última coluna)
+    
     # Normalização (z-score)
-    scaler = StandardScaler() # Função do scikit-learn que realiza o z-score
-    X_scaled = scaler.fit_transform(features)
+    media = np.mean(features, axis=0)
+    desvio_padrao = np.std(features, axis=0)
+    z_scores = (features - media) / (desvio_padrao + 1e-8) # 1e-8 para evitar divisão por 0
     
     # PCA
     # Funcionamento básico do PCA:
@@ -385,7 +469,7 @@ def aplicar_pca(features):
     # O segundo vetor principal (PC2) é perpendicular ao primeiro e captura a maior parte da variância restante, e assim por diante.
     
     pca = PCA()
-    pca.fit_transform(X_scaled)
+    pca.fit_transform(z_scores)
     
     var_exp = pca.explained_variance_ratio_ # Indica quanto cada componente explica da variância total
     cum_var_exp = np.cumsum(var_exp)
@@ -399,7 +483,7 @@ def aplicar_pca(features):
     
     # Projetando os dados originais nas 'num_dim_75' primeiras componentes
     pca_reduced = PCA(n_components=num_dim_75)
-    X_reduced = pca_reduced.fit_transform(X_scaled)
+    X_reduced = pca_reduced.fit_transform(z_scores)
 
     # Exemplo: pegar features reduzidas da primeira amostra
     sample_index = 0
@@ -409,50 +493,143 @@ def aplicar_pca(features):
     # Remove redundância entre features correlacionadas, e ainda mantém a maior parte da informação (variância).
     # Tem limitações, pois como o PCA assume linearidade padrões não lineares podem ser perdidos.
     # Há perda de informações, mesmo com 75% da variância os 25% ainda se perdem (são descartados).
-              
+    
 
-if __name__=="__main__":
+#4.5 e 4.6
+def fisher_score(estrutura):
+    # Extrair features e classes
+    features = np.array(estrutura[:, :-1], dtype=float)
+    classes = np.array(estrutura[:, -1], dtype=int)
+    print(classes)
+    
+    N, M = features.shape
+    
+    # Normalizar por feature (z-score)
+    #media = np.mean(features, axis=0)
+    #desvio_padrao = np.std(features, axis=0)
+    #z_scores = (features - media) / (desvio_padrao + 1e-8)
+
+    classes_unicas = np.unique(classes)
+    print(classes_unicas)
+    fisher_scores = np.zeros(M)
+    media_geral = np.mean(features, axis=0)
+
+    for c in classes_unicas:
+        features_c = features[classes == c]
+        num_amostras_c = N
+        if num_amostras_c == 0:
+            continue
+        
+        media_c = np.mean(features_c, axis=0)
+        variancia_c = np.var(features_c, axis=0)
+        
+        fisher_scores += num_amostras_c * ((media_c - media_geral) ** 2 / (variancia_c + 1e-8))         
+
+    return fisher_scores 
+
+    # Essa abordagem é vantajosa pois: é simples, sua implementação é direta (baseada em estatísticas básicas - média e variânicia);
+    # sua interpretação é clara já que cada feature é avaliada isoladamente das outras; funciona muito bem quando classes são separáveis por
+    # padrões lineares (como no caso, pela diferença de média); é extremamente eficiente - roda em tempo linear O(N.M).
+    # Suas limitações podem ser justamente as suas vantagens, pelo fato de apenas assumir padrões lineares ele acaba ignorando as relações não lineares entre as features;
+    # Como ele avalia cada feature isoladamente pode acabar por ignorar correlações entre features.
+
+
+def reliefF(estrutura, n_vizinhos=10):
+    features = np.array(estrutura[:, :-1], dtype=float)
+    classes = np.array(estrutura[:, -1], dtype=int)
+    
+    N, M = features.shape
+    pesos = np.zeros(M)
+
+    # Normalizar por feature (z-score)
+    #media = np.mean(features, axis=0)
+    #desvio = np.std(features, axis=0)
+    #z_scores = (features - media) / (desvio + 1e-8)
+    
+    nn = NearestNeighbors(n_neighbors=n_vizinhos + 1)
+    nn.fit(features)
+    
+    print(N)
+    
+    for i in range(N):
+        amostra = features[i]
+        classe = classes[i]
+        vizinhos = nn.kneighbors([amostra])[1] # [1] pega apenas os indíces dos vizinhos correspondentes
+        vizinhos = vizinhos[0][1:]  # Excluir o próprio 
+
+        mesma_classe = [] 
+        for j in vizinhos: 
+            if classes[j] == classe: 
+                mesma_classe.append(j) 
+                
+        dif_classe = [] 
+        for j in vizinhos: 
+            if classes[j] != classe: 
+                dif_classe.append(j)
+                
+        if mesma_classe:
+            pesos -= np.mean(np.abs(amostra - features[mesma_classe]), axis=0)
+        if dif_classe:
+            pesos += np.mean(np.abs(amostra - features[dif_classe]), axis=0)
+    
+    return pesos
+
+    # Vantagens: captura relações não lineares pois considera o espaço multidimensional e as distâncias entre as amostras;
+    # avalia importância contextual (não paneas individual), pois as distâncias são calculadas usando todas as features;
+    # Não aasume nenhuma forma de distribuição (ao contrário de métodos baseados em média/variância).
+    # Limitações: custo computacional pode ser alti, ja que é preciso calcular os vizinhos mais próximos para cada amostra (O(N^2) no pior caso);
+    # sensível a desbalanceamento, pois classes com poucas amostras podem ter poucos vizinhos da mesma classe ("hits"). 
+
+def dez_melhores_features():
+    top10_fisher_idx = np.argsort(f_scores)[-10:][::-1]
+    top10_relief_idx = np.argsort(pesos)[-10:][::-1]
+
+    print("Top10 Fisher indices:", top10_fisher_idx)
+    print("Top10 ReliefF indices:", top10_relief_idx)
+    print("Intersecção:", np.intersect1d(top10_fisher_idx, top10_relief_idx))
+
+
+if __name__ == "__main__":
+    #2
     dados = descarregar_dados()
     
+    #3.1
     calculo_modulo(dados)
-    
-    #representacao_grafica(FEAT)
-    
-    #outlier_density(dados)
-      
     FEATURES = np.array(FEATURES, dtype=object)
     #print(FEATURES.shape)
     
+    #representacao_grafica(FEAT)
+    
+    #3.2 (Densidade outliers)
+    #outlier_density(dados)
+      
+    #3.3 e 3.4 (Z-score)
     K=3
-
     #plot_zscore(K)
     
+    #3.6 e 3.7 (K-means)
     N=5
-    #K_means(N,4) #4 significa que estamos a analisar so o giroscopio relativamente a todas as atividades
+    #k_means(N)
     
+    #4.1 (Significância estatística)
     #sig_est(FEATURES)
     
-    vetor_features = features_extract(FEATURES)
-    vetor_features = np.array(vetor_features, dtype=object)
+    #4.2 (Extraira features)
+    vetor_features = feature_extraction(dados)
+    vetor_features = np.vstack(vetor_features)
+    print(vetor_features.shape)
+    time.sleep(10)
     
+    #4.3 e 4.4 (PCA)
     aplicar_pca(vetor_features)
     
-
-#Coluna 1: Device ID
-#Coluna 2: accelerometer x
-#Coluna 3: accelerometer y
-#Coluna 4: accelerometer z
-#Coluna 5: gyroscope x
-#Coluna 6: gyroscope y
-#Coluna 7: gyroscope z 
-#Coluna 8: magnetometer x
-#Coluna 9: magnetometer y
-#Coluna 10: magnetometer z
-#Coluna 11: Timestamp
-#Coluna 12: Activity Label
-
-
-
-
-
- 
+    #4.5 e 4.6 (fisher_score e reliefF)
+    f_scores = fisher_score(vetor_features)
+    print(f_scores)
+    print(f_scores.shape)
+    
+    pesos = reliefF(vetor_features, 5)
+    print(pesos)
+    print(pesos.shape)
+    
+    dez_melhores_features()
