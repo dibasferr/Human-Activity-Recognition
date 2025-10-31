@@ -11,7 +11,7 @@ from sklearn.neighbors import NearestNeighbors
 MAX_REPS= 42
 SWITCH_VALUE=3
 
-Max_Part_num=2
+Max_Part_num=4
 dev_num=5
 activity_num=17
 
@@ -19,11 +19,7 @@ ACELERACAO = 0
 GIROSCOPIO= 1
 MAGNETOMETRO=2
 
-#Uma especie de define
-FEAT= GIROSCOPIO
-
 FEATURES= []
-
 
 #2
 def descarregar_dados():
@@ -42,12 +38,10 @@ def descarregar_dados():
 
 
 #3.1
-#Arranjar uma forma de usar a funcao calculo modulo para esse plot(nao repetir codigo)
 def representacao_grafica():
-    modulos_atividades= FEATURES # [FEAT]
+    modulos_atividades= FEATURES 
     nomes_variaveis = ["Aceleração", "Giroscópio", "Magnetómetro"]
     i=1
-    print(len(modulos_atividades))
     for modulo in modulos_atividades:
         plt.boxplot(modulo)
         plt.title("Boxplot atividade " + nomes_variaveis[i-1])
@@ -144,9 +138,7 @@ def plot_zscore(K):
             
             z_score_test(FEATURES[i] , K )
     plt.show()    
-
-#calcular centroides
-
+    
 
 #3.6 e 3.7
 def k_means(N):
@@ -164,8 +156,6 @@ def k_means(N):
         dados_a_tratar= np.vstack(dados_a_tratar)
         dados_a_tratar= dados_a_tratar.T
         dados_transf.append(dados_a_tratar)
-        
-        
     
     centroides= []
     pos=0 #posicao do ponterio copia
@@ -280,7 +270,6 @@ def sig_est(modulos):
             print("Não rejeitamos H₀: as médias não diferem significativamente.\n\n")
             
 
-
 #ChatGPT
 
 # 1. Mean
@@ -362,32 +351,51 @@ def feature_spectral_entropy(mod1, mod2, mod3):
 
 #4.2
 def feature_extraction(dados):
-    dados=dados.astype(float)
-    resultado=[]
-    #Utilizados para navegar a estrutura de dados
-    pos_inicial=0
-    pos_final=pos_inicial
-    flag_final=False
-    while(True):
+    dados1 = dados.astype(float)
+    resultado = []
+
+    # só escolhemos a primeira device
+    dados1 = dados1[dados1[:, 0] == 1]
+
+    pos_inicial = 0
+    window_dur = 5000
+
+    while True:
+        # pega janela a partir da posição atual
         
-        ts_window = dados[pos_inicial:, :]
+        ts_window = dados1[pos_inicial:, :]
+        start_time = ts_window[0, -2]   # sempre usa o primeiro da janela
 
-        # Encontrar o índice relativo do primeiro elemento que excede o intervalo
-        relative_indices = np.where(ts_window - dados[pos_inicial] >= 5000)[0]
+        difs = ts_window[:, -2] - start_time
+        
+        verificacao_adicional = np.where(difs < 0)[0]  # pega array direto
 
-        if relative_indices.size > 0:
-            pos_final = pos_inicial + relative_indices[0]
+        indx = np.where(difs >= window_dur)[0] #e se nao existir
+        
+        if len(indx) == 0 and len(verificacao_adicional)==0:
+            break  # acabou
+    
+        if(len(indx) !=0):
+            if((len(verificacao_adicional)!=0) and (indx[0] < verificacao_adicional[0]) ): # mudança de pessoa / sequência
+                pos_final= pos_inicial+indx[0]
+            elif(len(verificacao_adicional)==0):
+                pos_final= pos_inicial+indx[0]
+                
+            elif((len(verificacao_adicional)!=0) and (indx[0] > verificacao_adicional[0])):
+                pos_inicial+= verificacao_adicional[0]
+                continue
         else:
-            # Caso não encontre nenhum timestamp >= 5000
-            pos_final = len(dados) - 1
-            flag_final = True
-        
-        acc = dados[pos_inicial:pos_final, 1:4]  # acelerômetro
-        gyro = dados[pos_inicial:pos_final, 4:7] # giroscópio
-        mag = dados[pos_inicial:pos_final, 7:10] # magnetômetro
+            pos_inicial += verificacao_adicional[0] 
+            continue
 
-        pos_inicial+= (pos_final-pos_inicial)//2
-        
+        # segmenta sensores
+        acc = dados1[pos_inicial:pos_final, 1:4]
+        gyro = dados1[pos_inicial:pos_final, 4:7]
+        mag = dados1[pos_inicial:pos_final, 7:10]
+
+        # move janela pela metade do tamanho atual
+        pos_inicial += (pos_final - pos_inicial) // 2
+
         # Calcular módulo de cada vetor
         mod_acc = np.linalg.norm(acc, axis=1)
         mod_gyro = np.linalg.norm(gyro, axis=1)
@@ -444,11 +452,10 @@ def feature_extraction(dados):
             zcr_feat + 
             mcr_feat + 
             entropy_feat +
-            [int(dados[pos_inicial,-1])]
+            [int(dados1[pos_inicial,-1])]
         )
         resultado.append(segmento)
-        if(flag_final): break
-        
+         
     return np.array(resultado, dtype=object)
 
 
@@ -475,11 +482,18 @@ def aplicar_pca(estrutura):
     cum_var_exp = np.cumsum(var_exp)
 
     print("Variância explicada por componente:", var_exp)
+    
+    print("\n")
+    
     print("Variância acumulada:", cum_var_exp)
+    
+    print("\n")
 
     # índice da primeira vez que a variância acumulada >= 0.75
     num_dim_75 = np.argmax(cum_var_exp >= 0.75) + 1
     print("Número de dimensões necessárias para 75% da variância:", num_dim_75)
+    
+    print("\n")
     
     # Projetando os dados originais nas 'num_dim_75' primeiras componentes
     pca_reduced = PCA(n_components=num_dim_75)
@@ -488,6 +502,7 @@ def aplicar_pca(estrutura):
     # Exemplo: pegar features reduzidas da primeira amostra
     sample_index = 0
     print("Features reduzidas da primeira amostra:", X_reduced[sample_index])
+    
 
     # Essa abordagem é vantajosa pois reduz a dimensão dos dados, facilitando análise e visualização.
     # Remove redundância entre features correlacionadas, e ainda mantém a maior parte da informação (variância).
@@ -500,17 +515,10 @@ def fisher_score(estrutura):
     # Extrair features e classes
     features = np.array(estrutura[:, :-1], dtype=float)
     classes = np.array(estrutura[:, -1], dtype=int)
-    print(classes)
     
     N, M = features.shape
-    
-    # Normalizar por feature (z-score)
-    #media = np.mean(features, axis=0)
-    #desvio_padrao = np.std(features, axis=0)
-    #z_scores = (features - media) / (desvio_padrao + 1e-8)
 
     classes_unicas = np.unique(classes)
-    print(classes_unicas)
     fisher_scores = np.zeros(M)
     media_geral = np.mean(features, axis=0)
 
@@ -540,16 +548,9 @@ def reliefF(estrutura, n_vizinhos=10):
     
     N, M = features.shape
     pesos = np.zeros(M)
-
-    # Normalizar por feature (z-score)
-    #media = np.mean(features, axis=0)
-    #desvio = np.std(features, axis=0)
-    #z_scores = (features - media) / (desvio + 1e-8)
     
     nn = NearestNeighbors(n_neighbors=n_vizinhos + 1)
     nn.fit(features)
-    
-    print(N)
     
     for i in range(N):
         amostra = features[i]
@@ -590,15 +591,15 @@ def dez_melhores_features():
 
 
 if __name__ == "__main__":
+    
     #2
     dados = descarregar_dados()
     
     #3.1
     calculo_modulo(dados)
     FEATURES = np.array(FEATURES, dtype=object)
-    #print(FEATURES.shape)
     
-    #representacao_grafica(FEAT)
+    #representacao_grafica()
     
     #3.2 (Densidade outliers)
     #outlier_density(dados)
@@ -612,24 +613,28 @@ if __name__ == "__main__":
     #k_means(N)
     
     #4.1 (Significância estatística)
-    #sig_est(FEATURES)
+    sig_est(FEATURES)
+    
+    print("\n")
     
     #4.2 (Extraira features)
     vetor_features = feature_extraction(dados)
     vetor_features = np.vstack(vetor_features)
-    print(vetor_features.shape)
-    time.sleep(10)
     
     #4.3 e 4.4 (PCA)
     aplicar_pca(vetor_features)
     
+    print("\n")
+    
     #4.5 e 4.6 (fisher_score e reliefF)
     f_scores = fisher_score(vetor_features)
-    print(f_scores)
-    print(f_scores.shape)
+    print("Ficher Scores: ", f_scores)
+    
+    print("\n")
     
     pesos = reliefF(vetor_features, 5)
-    print(pesos)
-    print(pesos.shape)
+    print("Pesos ReliefF: ", pesos)
+    
+    print("\n")
     
     dez_melhores_features()
