@@ -1,17 +1,15 @@
-import numpy as np, scipy, matplotlib.pyplot as plt
+import numpy as np, matplotlib.pyplot as plt
 import csv
-import math, time
-import random
+import time
 from scipy import stats
-from scipy.stats import kstest, norm
+from scipy.stats import kstest
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import NearestNeighbors
 
 MAX_REPS= 42
 SWITCH_VALUE=3
 
-Max_Part_num=4
+Max_Part_num=8
 dev_num=5
 activity_num=17
 
@@ -20,6 +18,8 @@ GIROSCOPIO= 1
 MAGNETOMETRO=2
 
 FEATURES= []
+
+############################################################## META 1 #########################################################################
 
 #2
 def descarregar_dados():
@@ -102,43 +102,58 @@ def outlier_density(dados):
             with open("Density_file",'a+') as file:
                 file.write("Densidade de outlier do dataset da " + str(i) + " atividade: " + str(d) +"\n")
 
-#3.3 e 3.4
+
+# 3.3 e 3.4
 def z_score_test(modulos, k):
-    outliers = []
-    i=1
+    #plt.figure(figsize=(14,6))
+    x_labels = []
+    x_data = []
+    y_data = []
+    colors_all = []
+
+    atividade = 1
     for modulo in modulos:
-        modulo = np.array(modulo, dtype=object)
-        
+        modulo = np.array(modulo, dtype=float)
+
         media = np.mean(modulo)
         desvio_padrao = np.std(modulo)
 
         if desvio_padrao > 0:
             z_scores = (modulo - media) / desvio_padrao
         else:
-            np.zeros_like(modulo)
+            z_scores = np.zeros_like(modulo)
         
         outlier_indices = np.where(np.abs(z_scores) > k)
-        outliers.append(outlier_indices)
         
-        colors=np.array(['b']*len(modulo))
-        colors[outlier_indices]= 'r'
-        plt.subplot(1,16,i)
+        colors = np.array(['b'] * len(modulo))
+        colors[outlier_indices] = 'r'
+
+        # eixo X fixo = número da atividade repetido
+        x_vals = np.full(len(modulo), atividade)
+
+        x_data.extend(x_vals)
+        y_data.extend(modulo)
+        colors_all.extend(colors)
         
-        plt.scatter(np.linspace(0, len(modulo) , len(modulo)) , modulo, c=colors)
-        plt.title("Boxplot atividade " + str(i))
-        i+=1
-    
-    
+        x_labels.append(f"Atv {atividade}")
+        atividade += 1
+
+    plt.scatter(x_data, y_data, c=colors_all, s=10)
+    plt.xticks(range(1, len(modulos)+1), x_labels, rotation=45)
+    plt.title("Z-Score Outliers por Atividade")
+    plt.xlabel("Atividades")
+    plt.ylabel("Valores")
+    plt.grid(axis='x')
+
 def plot_zscore(K):
-    for i in range (0, len(FEATURES)):
-            
-            if i ==0 : plt.figure(num="Acelerometro")
-            if i ==1 : plt.figure(num="Giroscopio")
-            if i ==2 : plt.figure(num="Magnetometro")
-            
-            z_score_test(FEATURES[i] , K )
-    plt.show()    
-    
+    sensores = ["Acelerômetro", "Giroscópio", "Magnetômetro"]
+
+    for i in range(len(FEATURES)):
+        plt.figure(num=sensores[i], figsize=(15,6))
+        z_score_test(FEATURES[i], K)
+
+    plt.show()
+ 
 
 #3.6 e 3.7
 def k_means(N):
@@ -156,10 +171,9 @@ def k_means(N):
         dados_a_tratar= np.vstack(dados_a_tratar)
         dados_a_tratar= dados_a_tratar.T
         dados_transf.append(dados_a_tratar)
-    
     centroides= []
     pos=0 #posicao do ponterio copia
-    dados_transf=np.array(dados_transf)
+    dados_transf=np.array(dados_transf, dtype=object)
     dados_transf=np.vstack(dados_transf)
     
     
@@ -247,6 +261,7 @@ def sig_est(modulos):
     a=0
     for sensor in modulos:
         print(aux[a]+"\n")
+        
         a+=1
         #Analise de normalidade para cada sensor
         for i in range(1, activity_num):
@@ -356,39 +371,58 @@ def feature_extraction(dados):
 
     # só escolhemos a primeira device
     dados1 = dados1[dados1[:, 0] == 1]
-
+    time.sleep(2)
     pos_inicial = 0
     window_dur = 5000
-
+    count=1
     while True:
-        # pega janela a partir da posição atual
         
+        if pos_inicial >= len(dados1):
+            break
+
         ts_window = dados1[pos_inicial:, :]
-        start_time = ts_window[0, -2]   # sempre usa o primeiro da janela
+        if len(ts_window) == 0:
+            break
 
+        start_time = ts_window[0, -2]
         difs = ts_window[:, -2] - start_time
-        
-        verificacao_adicional = np.where(difs < 0)[0]  # pega array direto
 
-        indx = np.where(difs >= window_dur)[0] #e se nao existir
-        
-        if len(indx) == 0 and len(verificacao_adicional)==0:
-            break  # acabou
-    
-        if(len(indx) !=0):
-            if((len(verificacao_adicional)!=0) and (indx[0] < verificacao_adicional[0]) ): # mudança de pessoa / sequência
-                pos_final= pos_inicial+indx[0]
-            elif(len(verificacao_adicional)==0):
-                pos_final= pos_inicial+indx[0]
-                
-            elif((len(verificacao_adicional)!=0) and (indx[0] > verificacao_adicional[0])):
-                pos_inicial+= verificacao_adicional[0]
-                continue
-        else:
-            pos_inicial += verificacao_adicional[0] 
+        verificacao_adicional = np.where(difs < 0)[0]
+        indx = np.where(difs >= window_dur)[0]
+
+        # fim dos dados
+        if len(indx) == 0 and len(verificacao_adicional) == 0:
+            break
+
+        first_indx = indx[0] if len(indx) > 0 else None
+        first_verif = verificacao_adicional[0] if len(verificacao_adicional) > 0 else None
+
+        # proteger contra loops infinitos
+        if first_verif == 0 or first_indx == 0:
+            pos_inicial += 1
             continue
 
-        # segmenta sensores
+        # --- Decisão ---
+        if first_indx is not None:
+            if first_verif is not None:
+                if first_verif < first_indx:
+                    pos_inicial += first_verif + 1
+                    count += 1
+                    continue
+                else:
+                    pos_final = pos_inicial + first_indx
+            else:
+                pos_final = pos_inicial + first_indx
+        else:
+            pos_inicial += first_verif +1
+            count += 1
+            continue
+
+       
+        if( min(dados1[pos_inicial:pos_final,-1]) != max(dados1[pos_inicial:pos_final,-1])): #duas atividades
+            pos_inicial += (pos_final - pos_inicial) // 2
+            continue
+        
         acc = dados1[pos_inicial:pos_final, 1:4]
         gyro = dados1[pos_inicial:pos_final, 4:7]
         mag = dados1[pos_inicial:pos_final, 7:10]
@@ -481,19 +515,38 @@ def aplicar_pca(estrutura):
     var_exp = pca.explained_variance_ratio_ # Indica quanto cada componente explica da variância total
     cum_var_exp = np.cumsum(var_exp)
 
-    print("Variância explicada por componente:", var_exp)
-    
-    print("\n")
-    
-    print("Variância acumulada:", cum_var_exp)
-    
-    print("\n")
+    # ---------- PLOTS ----------
+    plt.figure(figsize=(12,5))
+
+    # Gráfico 1: Variância explicada por componente
+    plt.subplot(1,2,1)
+    plt.bar(range(1, len(var_exp)+1), var_exp, alpha=0.7, align='center')
+    plt.xlabel('Componentes Principais')
+    plt.ylabel('Variância Explicada')
+    plt.title('Variância Explicada por Componente')
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.legend()
+
+    # Gráfico 2: Variância acumulada
+    plt.subplot(1,2,2)
+    plt.plot(range(1, len(cum_var_exp)+1), cum_var_exp, marker='o')
+    plt.axhline(y=0.75, color='r', linestyle='--', label='75% da Variância')
+    plt.xlabel('Número de Componentes')
+    plt.ylabel('Variância Acumulada')
+    plt.title('Variância Acumulada das Componentes')
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+    # ---------- RESULTADOS ----------
+    print("Variância explicada por componente:", np.round(var_exp, 4))
+    print("\nVariância acumulada:", np.round(cum_var_exp, 4))
 
     # índice da primeira vez que a variância acumulada >= 0.75
     num_dim_75 = np.argmax(cum_var_exp >= 0.75) + 1
     print("Número de dimensões necessárias para 75% da variância:", num_dim_75)
-    
-    print("\n")
     
     # Projetando os dados originais nas 'num_dim_75' primeiras componentes
     pca_reduced = PCA(n_components=num_dim_75)
@@ -588,9 +641,16 @@ def dez_melhores_features():
     print("Top10 Fisher indices:", top10_fisher_idx)
     print("Top10 ReliefF indices:", top10_relief_idx)
     print("Intersecção:", np.intersect1d(top10_fisher_idx, top10_relief_idx))
+    
+
+############################################################## META 2 #########################################################################
+
+
 
 
 if __name__ == "__main__":
+    
+    ############################################################## META 1 #########################################################################
     
     #2
     dados = descarregar_dados()
@@ -613,21 +673,20 @@ if __name__ == "__main__":
     #k_means(N)
     
     #4.1 (Significância estatística)
-    sig_est(FEATURES)
+    #sig_est(FEATURES)
     
-    print("\n")
-    
-    #4.2 (Extraira features)
+    #4.2 (Extrair as features)
     vetor_features = feature_extraction(dados)
     vetor_features = np.vstack(vetor_features)
     
     #4.3 e 4.4 (PCA)
-    aplicar_pca(vetor_features)
+    #aplicar_pca(vetor_features)
     
     print("\n")
     
     #4.5 e 4.6 (fisher_score e reliefF)
     f_scores = fisher_score(vetor_features)
+    print(f_scores[0])
     print("Ficher Scores: ", f_scores)
     
     print("\n")
@@ -638,3 +697,6 @@ if __name__ == "__main__":
     print("\n")
     
     dez_melhores_features()
+    
+    ############################################################## META 2 #########################################################################
+    
