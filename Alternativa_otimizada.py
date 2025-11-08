@@ -365,133 +365,163 @@ def feature_spectral_entropy(mod1, mod2, mod3):
 
 
 #4.2
+#4.2 Funcao explicada no relatório 
 def feature_extraction(dados):
+    
     dados1 = dados.astype(float)
     resultado = []
 
     # só escolhemos a primeira device
     dados1 = dados1[dados1[:, 0] == 1]
-    time.sleep(2)
-    pos_inicial = 0
-    window_dur = 5000
-    count=1
-    while True:
-        
-        if pos_inicial >= len(dados1):
-            break
 
+    timestamps= dados1[:,-2]
+        
+    difs= np.diff(timestamps)
+    
+    
+    next_person_idx = np.where(difs < 0)[0]
+
+        
+        
+    pos_inicial=0
+    pos_final=pos_inicial
+    limite = len(dados1)
+    dados_por_pessoa= []
+    
+    while pos_inicial < limite:
+        # início de uma nova pessoa
+
+        # obtém o bloco de dados desta pessoa
         ts_window = dados1[pos_inicial:, :]
-        if len(ts_window) == 0:
-            break
-
-        start_time = ts_window[0, -2]
-        difs = ts_window[:, -2] - start_time
-
-        verificacao_adicional = np.where(difs < 0)[0]
-        indx = np.where(difs >= window_dur)[0]
-
-        # fim dos dados
-        if len(indx) == 0 and len(verificacao_adicional) == 0:
-            break
-
-        first_indx = indx[0] if len(indx) > 0 else None
-        first_verif = verificacao_adicional[0] if len(verificacao_adicional) > 0 else None
-
-        # proteger contra loops infinitos
-        if first_verif == 0 or first_indx == 0:
-            pos_inicial += 1
-            continue
-
-        # --- Decisão ---
-        if first_indx is not None:
-            if first_verif is not None:
-                if first_verif < first_indx:
-                    pos_inicial += first_verif + 1
-                    count += 1
-                    continue
-                else:
-                    pos_final = pos_inicial + first_indx
-            else:
-                pos_final = pos_inicial + first_indx
+        timestamps= ts_window[:,-2]
+        
+        difs= np.diff(timestamps)
+        
+        
+        next_person_idx = np.where(difs < 0)[0]
+        
+        if len(next_person_idx) > 0:
+            # posição do primeiro timestamp regressivo
+            pos_final = pos_inicial + next_person_idx[0] + 1
         else:
-            pos_inicial += first_verif +1
-            count += 1
-            continue
+            # se não há mais quebras → fim dos dados
+            pos_final = limite
+            
+        if(pos_final-pos_inicial<5000): 
+            pos_inicial=pos_final
+            continue #alguns dados nao estao com timestamp continua. E todos os conjuntos de dados chegam a 50000
+        #dados de UMA pessoa
+        bloco = dados1[pos_inicial:pos_final, :]
+        
+        dados_por_pessoa.append(bloco)
+        
+        pos_inicial = pos_final
+    
+    count=1
+    for person in dados_por_pessoa:
+        
+        pos_inicial = 0
+        pos_final=pos_inicial
+        window_dur = 5000
+        
+        while(pos_inicial < len(person)-1):
+            print(pos_inicial)
+            ts_window = person[pos_inicial:, :] 
+            if len(ts_window) == 0: break 
+            start_time = ts_window[0, -2] 
+            difs = ts_window[:, -2] - start_time 
+        
+            indx = np.where(difs >= window_dur)[0]
+            
+            first_indx = indx[0] if len(indx) > 0 else None 
 
-       
-        if( min(dados1[pos_inicial:pos_final,-1]) != max(dados1[pos_inicial:pos_final,-1])): #duas atividades
+            if first_indx==None : break
+            
+            pos_final = pos_inicial + first_indx   
+        
+            acc = person[pos_inicial:pos_final, 1:4]
+            gyro = person[pos_inicial:pos_final, 4:7]
+            mag = person[pos_inicial:pos_final, 7:10]
+            
+
+            if(max(person[pos_inicial:pos_final, -1]) != min(person[pos_inicial:pos_final, -1])) : 
+                
+                pos_inicial += (pos_final - pos_inicial) // 2  # move janela pela metade do tamanho atual
+                continue #duas atividades
+            
+            if(len(acc) <=1 ) : 
+                pos_inicial= pos_final
+                continue #evitar media de empty segment
+
+
             pos_inicial += (pos_final - pos_inicial) // 2
-            continue
-        
-        acc = dados1[pos_inicial:pos_final, 1:4]
-        gyro = dados1[pos_inicial:pos_final, 4:7]
-        mag = dados1[pos_inicial:pos_final, 7:10]
+            
+            
+            # Calcular módulo de cada vetor
+            mod_acc = np.linalg.norm(acc, axis=1)
+            mod_gyro = np.linalg.norm(gyro, axis=1)
+            mod_mag = np.linalg.norm(mag, axis=1)
+            
+            
+            
+            #Chamar as funcoes de calculos
+            #Na ultima posicao de cada linha está o tipo de atividade
+            # 1. Mean
+            mean_feat = feature_mean(mod_acc, mod_gyro, mod_mag)
 
-        # move janela pela metade do tamanho atual
-        pos_inicial += (pos_final - pos_inicial) // 2
+            # 2. Median
+            median_feat = feature_median(mod_acc, mod_gyro, mod_mag)
 
-        # Calcular módulo de cada vetor
-        mod_acc = np.linalg.norm(acc, axis=1)
-        mod_gyro = np.linalg.norm(gyro, axis=1)
-        mod_mag = np.linalg.norm(mag, axis=1)
-        
-        #Chamar as funcoes de calculos
-        #Na ultima posicao de cada linha está o tipo de atividade
-        # 1. Mean
-        mean_feat = feature_mean(mod_acc, mod_gyro, mod_mag)
+            # 3. Standard Deviation
+            std_feat = feature_std(mod_acc, mod_gyro, mod_mag)
 
-        # 2. Median
-        median_feat = feature_median(mod_acc, mod_gyro, mod_mag)
+            # 4. Variance
+            var_feat = feature_variance(mod_acc, mod_gyro, mod_mag)
 
-        # 3. Standard Deviation
-        std_feat = feature_std(mod_acc, mod_gyro, mod_mag)
+            # 5. Root Mean Square (RMS)
+            rms_feat = feature_rms(mod_acc, mod_gyro, mod_mag)
 
-        # 4. Variance
-        var_feat = feature_variance(mod_acc, mod_gyro, mod_mag)
+            # 6. Averaged Derivatives
+            avg_deriv_feat = feature_avg_derivative(mod_acc, mod_gyro, mod_mag)
 
-        # 5. Root Mean Square (RMS)
-        rms_feat = feature_rms(mod_acc, mod_gyro, mod_mag)
+            # 7. Skewness
+            skew_feat = feature_skewness(mod_acc, mod_gyro, mod_mag)
 
-        # 6. Averaged Derivatives
-        avg_deriv_feat = feature_avg_derivative(mod_acc, mod_gyro, mod_mag)
+            # 8. Kurtosis
+            kurt_feat = feature_kurtosis(mod_acc, mod_gyro, mod_mag)
 
-        # 7. Skewness
-        skew_feat = feature_skewness(mod_acc, mod_gyro, mod_mag)
+            # 9. Interquartile Range (IQR)
+            iqr_feat = feature_iqr(mod_acc, mod_gyro, mod_mag)
 
-        # 8. Kurtosis
-        kurt_feat = feature_kurtosis(mod_acc, mod_gyro, mod_mag)
+            # 10. Zero Crossing Rate (ZCR)
+            zcr_feat = feature_zero_crossing_rate(mod_acc, mod_gyro, mod_mag)
 
-        # 9. Interquartile Range (IQR)
-        iqr_feat = feature_iqr(mod_acc, mod_gyro, mod_mag)
+            # 11. Mean Crossing Rate (MCR)
+            mcr_feat = feature_mean_crossing_rate(mod_acc, mod_gyro, mod_mag)
 
-        # 10. Zero Crossing Rate (ZCR)
-        zcr_feat = feature_zero_crossing_rate(mod_acc, mod_gyro, mod_mag)
-
-        # 11. Mean Crossing Rate (MCR)
-        mcr_feat = feature_mean_crossing_rate(mod_acc, mod_gyro, mod_mag)
-
-        # 12. Spectral Entropy
-        entropy_feat = feature_spectral_entropy(mod_acc, mod_gyro, mod_mag)
-        
-        segmento = (
-            mean_feat + 
-            median_feat + 
-            std_feat + 
-            var_feat + 
-            rms_feat + 
-            avg_deriv_feat + 
-            skew_feat + 
-            kurt_feat + 
-            iqr_feat + 
-            zcr_feat + 
-            mcr_feat + 
-            entropy_feat +
-            [int(dados1[pos_inicial,-1])]
-        )
-        resultado.append(segmento)
-         
+            # 12. Spectral Entropy
+            entropy_feat = feature_spectral_entropy(mod_acc, mod_gyro, mod_mag)
+            
+            segmento = (
+                mean_feat + 
+                median_feat + 
+                std_feat + 
+                var_feat + 
+                rms_feat + 
+                avg_deriv_feat + 
+                skew_feat + 
+                kurt_feat + 
+                iqr_feat + 
+                zcr_feat + 
+                mcr_feat + 
+                entropy_feat +
+                [int(person[pos_inicial,-1])] + 
+                [count]
+            )
+            resultado.append(segmento)
+        count+=1
+ 
     return np.array(resultado, dtype=object)
-
 
 #4.3 e 4.4
 def aplicar_pca(estrutura):
