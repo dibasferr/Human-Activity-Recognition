@@ -5,6 +5,8 @@ from scipy import stats
 from scipy.stats import kstest
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
+from embeddings_extractor import embedding_main
+from sklearn.model_selection import train_test_split
 
 MAX_REPS= 42
 SWITCH_VALUE=3
@@ -664,14 +666,18 @@ def reliefF(estrutura, n_vizinhos=10):
     # Limitações: custo computacional pode ser alti, ja que é preciso calcular os vizinhos mais próximos para cada amostra (O(N^2) no pior caso);
     # sensível a desbalanceamento, pois classes com poucas amostras podem ter poucos vizinhos da mesma classe ("hits"). 
 
-def dez_melhores_features():
+def dez_melhores_features(pesos, f_scores):
     top10_fisher_idx = np.argsort(f_scores)[-10:][::-1]
     top10_relief_idx = np.argsort(pesos)[-10:][::-1]
 
     print("Top10 Fisher indices:", top10_fisher_idx)
     print("Top10 ReliefF indices:", top10_relief_idx)
     print("Intersecção:", np.intersect1d(top10_fisher_idx, top10_relief_idx))
-    
+
+def quinze_melhores_features(pesos):
+    top15_relief_idx = np.argsort(pesos)[-15:][::-1]
+    return top15_relief_idx
+  
 
 ############################################################## META 2 #########################################################################
 
@@ -728,6 +734,141 @@ def smote(dados, contagens, atividade, num_vizinhos):
     return dados_atualizado, atividades_atualizada, amostras_sinteticas
 
 
+#2.1 
+def retrive_embedding():
+    return embedding_main()
+
+#3.1
+def split_data_intraSubj(subj):
+    
+    
+    #Escolher o K
+    #Fazer para varios K's e determinar o melhor K 
+    
+    for i in range(0,6): #6 splits por pessoa
+        
+        #NOTA: COM random_state FIXO A DISTRIBUIÇÃO É SEMPRE IGUAL
+        # penultima coluna refere-se a atividade e a ultima é a pessoa em causa
+        
+        ############################################ SPLIT EMBEDDING ##############################################
+        mask = embedding[:,-1] == subj  # dados dessa pessoa
+    
+        X_subj = embedding[mask]
+        y_subj = embedding[:,-2][mask]
+        
+        # 60% treino, 40% resto
+        X_train_s, X_temp, y_train_s, y_temp = train_test_split(
+            X_subj, y_subj, test_size=0.4, random_state=42+i, shuffle=True)
+        
+        # 20/20 split do restante
+        X_val_s, X_test_s, y_val_s, y_test_s = train_test_split(
+            X_temp, y_temp, test_size=0.5, random_state=42+i, shuffle=True)
+        
+        #FAZER TREINO
+        ####################################### EMBEDDING RELIEFF ######################################################
+        pesos= reliefF(X_subj,5) #5 numero provisorio
+        top15= quinze_melhores_features(pesos)
+        X_reduzido = X_subj[:, top15]
+        
+        mask = X_reduzido[:,-1] == subj  # dados dessa pessoa
+        
+        X_subj = X_reduzido[mask]
+        y_subj = X_reduzido[:,-2][mask]
+
+        # 60% treino, 40% resto
+        X_train_s, X_temp, y_train_s, y_temp = train_test_split(
+            X_subj, y_subj, test_size=0.4, random_state=42+i, shuffle=True)
+        
+        # 20/20 split do restante
+        X_val_s, X_test_s, y_val_s, y_test_s = train_test_split(
+            X_temp, y_temp, test_size=0.5, random_state=42+i, shuffle=True)
+        #FAZER TREINO
+        
+        ############################################ EBEDDING PCA #####################################################
+        mask = embedding[:,-1] == subj  # dados dessa pessoa
+    
+        X_subj = embedding[mask]
+        
+        X_reduced= aplicar_pca(X_subj,0.90)
+        
+        mask = X_reduced[:,-1] == subj  # dados dessa pessoa
+        
+        X_subj = X_reduced[mask]
+        y_subj = X_reduced[:,-2][mask]
+        
+        # 60% treino, 40% resto
+        X_train_s, X_temp, y_train_s, y_temp = train_test_split(
+            X_subj, y_subj, test_size=0.4, random_state=42+i, shuffle=True)
+        
+        # 20/20 split do restante
+        X_val_s, X_test_s, y_val_s, y_test_s = train_test_split(
+            X_temp, y_temp, test_size=0.5, random_state=42+i, shuffle=True)
+        #FAZER TREINO
+        
+       
+        ############################################ SPLIT FEATURES ###################################################
+        mask = vetor_features[:,-1] == subj  # dados dessa pessoa
+    
+    
+        X_subj = vetor_features[mask]
+        y_subj = vetor_features[:,-2][mask]
+        
+        # 60% treino, 40% resto
+        X_train_s, X_temp, y_train_s, y_temp = train_test_split(
+            X_subj, y_subj, test_size=0.4, random_state=42+i, shuffle=True)
+        
+        # 20/20 split do restante
+        X_val_s, X_test_s, y_val_s, y_test_s = train_test_split(
+            X_temp, y_temp, test_size=0.5, random_state=42+i, shuffle=True)
+        #FAZER TREINO
+        
+        
+        ####################################### FEATURES RELIEFF ########################################################
+        pesos= reliefF(X_subj,5) #5 numero provisorio
+        top15= quinze_melhores_features(pesos)
+        X_reduzido = X_subj[:, top15]
+        
+        mask = X_reduzido[:,-1] == subj  # dados dessa pessoa
+        
+        X_subj = X_reduzido[mask]
+        y_subj = X_reduzido[:,-2][mask]
+
+        # 60% treino, 40% resto
+        X_train_s, X_temp, y_train_s, y_temp = train_test_split(
+            X_subj, y_subj, test_size=0.4, random_state=42+i, shuffle=True)
+        
+        # 20/20 split do restante
+        X_val_s, X_test_s, y_val_s, y_test_s = train_test_split(
+            X_temp, y_temp, test_size=0.5, random_state=42+i, shuffle=True)
+        #FAZER TREINO
+        
+        #################################################################################################################
+    
+
+        ######################################## SPLIT FEATURES PCA #####################################################
+        mask = vetor_features[:,-1] == subj  # dados dessa pessoa
+    
+        X_subj = vetor_features[mask]
+        
+        X_reduced= aplicar_pca(X_subj,0.90)
+        
+        mask = X_reduced[:,-1] == subj  # dados dessa pessoa
+        
+        X_subj = X_reduced[mask]
+        y_subj = X_reduced[:,-2][mask]
+
+        # 60% treino, 40% resto
+        X_train_s, X_temp, y_train_s, y_temp = train_test_split(
+            X_subj, y_subj, test_size=0.4, random_state=42+i, shuffle=True)
+        
+        # 20/20 split do restante
+        X_val_s, X_test_s, y_val_s, y_test_s = train_test_split(
+            X_temp, y_temp, test_size=0.5, random_state=42+i, shuffle=True)
+        #FAZER TREINO
+       
+###################################################################################################################################################
+
+
 if __name__ == "__main__":
     
     ############################################################## META 1 #########################################################################
@@ -776,7 +917,7 @@ if __name__ == "__main__":
     
     #print("\n")
     
-    #dez_melhores_features()
+    #dez_melhores_features(pesos, f_scores)
     
     ############################################################## META 2 #########################################################################
     
@@ -790,4 +931,21 @@ if __name__ == "__main__":
         print(i)
         dados_filtrados, atividades_atualizada, amostras_sinteticas = smote(dados_filtrados, contagens, atividade = i, num_vizinhos = 5)
     atividades, contagens = verificar_balanceamento(dados_filtrados)
+    
+    vetor_features = np.load("cache_vetor_features.npy", allow_pickle=True) 
+    #2.1
+    embedding= retrive_embedding()
+    print(embedding.shape)
+    
+    #3.1
+    X_train, X_val, X_test = [], [], []
+    y_train, y_val, y_test = [], [], []
+
+    for subj in np.unique(embedding[:,-1]):
+
+        split_data_intraSubj(subj)
+        
+        #Fazer o mesmo para features
+        #E para features e embedding com pca e relieff
+
     
