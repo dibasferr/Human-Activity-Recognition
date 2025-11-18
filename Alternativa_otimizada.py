@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 MAX_REPS= 42
 SWITCH_VALUE=3
 
-Max_Part_num=8
+Max_Part_num=14
 dev_num=5
 activity_num=17
 
@@ -29,12 +29,17 @@ def descarregar_dados():
     for i in range(0,Max_Part_num+1):
         caminho = 'sample/part'
         caminho= f"{caminho}{i}/"
+        array_aux=[]
+        
         for j in range(1,dev_num+1):
             caminho2 = f"{caminho}part{i}dev{j}.csv"
             with open(caminho2,newline='') as csv_file:
                 linha = csv.reader(csv_file, delimiter=',')
                 for row in linha:
-                    array.append(row)
+                    array_aux.append(row)
+        
+        array.append(array_aux)
+            
     dados = np.array(array, dtype=object)
     return dados
 
@@ -369,95 +374,36 @@ def feature_spectral_entropy(mod1, mod2, mod3):
 #4.2
 #4.2 Funcao explicada no relatório 
 def feature_extraction(dados):
+    resultado =[]
     
-    dados1 = dados.astype(float)
-    resultado = []
-
-    # só escolhemos a primeira device
-    dados1 = dados1[dados1[:, 0] == 1]
-
-    timestamps= dados1[:,-2]
+    dados_por_pessoa=dados
         
-    difs= np.diff(timestamps)
-    
-    
-    next_person_idx = np.where(difs < 0)[0]
-
-        
-        
-    pos_inicial=0
-    pos_final=pos_inicial
-    limite = len(dados1)
-    dados_por_pessoa= []
-    
-    while pos_inicial < limite:
-        # início de uma nova pessoa
-
-        # obtém o bloco de dados desta pessoa
-        ts_window = dados1[pos_inicial:, :]
-        timestamps= ts_window[:,-2]
-        
-        difs= np.diff(timestamps)
-        
-        
-        next_person_idx = np.where(difs < 0)[0]
-        
-        if len(next_person_idx) > 0:
-            # posição do primeiro timestamp regressivo
-            pos_final = pos_inicial + next_person_idx[0] + 1
-        else:
-            # se não há mais quebras → fim dos dados
-            pos_final = limite
-            
-        if(pos_final-pos_inicial<5000): 
-            pos_inicial=pos_final
-            continue #alguns dados nao estao com timestamp continua. E todos os conjuntos de dados chegam a 50000
-        #dados de UMA pessoa
-        bloco = dados1[pos_inicial:pos_final, :]
-        
-        dados_por_pessoa.append(bloco)
-        
-        pos_inicial = pos_final
-    
     count=1
     for person in dados_por_pessoa:
         
-        pos_inicial = 0
-        pos_final=pos_inicial
-        window_dur = 5000
-        
-        while(pos_inicial < len(person)-1):
-            print(pos_inicial)
-            ts_window = person[pos_inicial:, :] 
-            if len(ts_window) == 0: break 
-            start_time = ts_window[0, -2] 
-            difs = ts_window[:, -2] - start_time 
-        
-            indx = np.where(difs >= window_dur)[0]
-            
-            first_indx = indx[0] if len(indx) > 0 else None 
+        person= np.array(person, dtype=float)
+        TIMESTAMP_COL = 10
+        MIN_SEGMENT_SIZE = 20
+        win_size = 5000
+        start_time = person[0,TIMESTAMP_COL]
+        end_time = start_time + win_size
 
-            if first_indx==None : break
-            
-            pos_final = pos_inicial + first_indx   
-        
-            acc = person[pos_inicial:pos_final, 1:4]
-            gyro = person[pos_inicial:pos_final, 4:7]
-            mag = person[pos_inicial:pos_final, 7:10]
-            
+    
+       
+        while end_time < person[-1,TIMESTAMP_COL]:
+            mask = (person[:,TIMESTAMP_COL] >= start_time) & (person[:,TIMESTAMP_COL] < end_time)
 
-            if(max(person[pos_inicial:pos_final, -1]) != min(person[pos_inicial:pos_final, -1])) : 
+            if np.sum(mask) <= MIN_SEGMENT_SIZE or np.any(person[mask, -1] != person[mask, -1][0]):
+                start_time = end_time - win_size/2
+                end_time = start_time + win_size
+                continue
                 
-                pos_inicial += (pos_final - pos_inicial) // 2  # move janela pela metade do tamanho atual
-                continue #duas atividades
-            
-            if(len(acc) <=1 ) : 
-                pos_inicial= pos_final
-                continue #evitar media de empty segment
+            acc = person[mask, 1:4]
+            gyro = person[mask, 4:7]
+            mag = person[mask, 7:10]
 
-
-            pos_inicial += (pos_final - pos_inicial) // 2
-            
+            start_time = end_time - win_size/2
+            end_time = start_time + win_size
             
             # Calcular módulo de cada vetor
             mod_acc = np.linalg.norm(acc, axis=1)
@@ -517,17 +463,18 @@ def feature_extraction(dados):
                 zcr_feat + 
                 mcr_feat + 
                 entropy_feat +
-                [int(person[pos_inicial,-1])] + 
+                [ person[mask, -1][0]] +  #1ª atvidade, como todos têm a mesma atividade... <- confirmado la em cima
                 [count]
             )
             resultado.append(segmento)
+        
         count+=1
  
     return np.array(resultado, dtype=object)
 
 #4.3 e 4.4
-def aplicar_pca(estrutura):
-    features = np.array(estrutura[:, :-1], dtype=float) # elimina coluna de classes (última coluna)
+def aplicar_pca(estrutura, explainability):
+    features = np.array(estrutura[:, :-2], dtype=float) # elimina colunas de classes (últimas colunas)
     
     # Normalização (z-score)
     media = np.mean(features, axis=0)
@@ -576,19 +523,27 @@ def aplicar_pca(estrutura):
     print("Variância explicada por componente:", np.round(var_exp, 4))
     print("\nVariância acumulada:", np.round(cum_var_exp, 4))
 
-    # índice da primeira vez que a variância acumulada >= 0.75
-    num_dim_75 = np.argmax(cum_var_exp >= 0.75) + 1
-    print("Número de dimensões necessárias para 75% da variância:", num_dim_75)
-    
-    # Projetando os dados originais nas 'num_dim_75' primeiras componentes
-    pca_reduced = PCA(n_components=num_dim_75)
+    # índice da primeira vez que a variância acumulada >= 0.75 by default
+    num_dim=0
+    #alterado para a segunda meta
+    if explainability is None:
+        num_dim = np.argmax(cum_var_exp >= 0.75) + 1
+        print("Número de dimensões necessárias para 75% da variância:", num_dim)
+    else:
+        num_dim = np.argmax(cum_var_exp >= explainability) + 1
+        
+        
+    # Projetando os dados originais nas 'num_dim' primeiras componentes
+    pca_reduced = PCA(n_components=num_dim)
     X_reduced = pca_reduced.fit_transform(z_scores)
 
     # Exemplo: pegar features reduzidas da primeira amostra
     sample_index = 0
     print("Features reduzidas da primeira amostra:", X_reduced[sample_index])
     
-
+    labels = np.array(estrutura[:, -2:], dtype=float)
+    X_reduced = np.hstack([X_reduced, labels])
+    return X_reduced
     # Essa abordagem é vantajosa pois reduz a dimensão dos dados, facilitando análise e visualização.
     # Remove redundância entre features correlacionadas, e ainda mantém a maior parte da informação (variância).
     # Tem limitações, pois como o PCA assume linearidade padrões não lineares podem ser perdidos.
@@ -674,13 +629,13 @@ def dez_melhores_features(pesos, f_scores):
     print("Top10 ReliefF indices:", top10_relief_idx)
     print("Intersecção:", np.intersect1d(top10_fisher_idx, top10_relief_idx))
 
+
 def quinze_melhores_features(pesos):
     top15_relief_idx = np.argsort(pesos)[-15:][::-1]
     return top15_relief_idx
-  
+
 
 ############################################################## META 2 #########################################################################
-
 def verificar_balanceamento(dados):
     # Contar as ocorrências
     atividades, contagens = np.unique(dados[:, -1], return_counts=True)
@@ -868,17 +823,17 @@ def split_data_intraSubj(subj):
        
 ###################################################################################################################################################
 
-
 if __name__ == "__main__":
-    
+    """
     ############################################################## META 1 #########################################################################
-    
     #2
-    dados = descarregar_dados()
+    dadosParticinado = descarregar_dados()
     
     #3.1
-    #calculo_modulo(dados)
-    #FEATURES = np.array(FEATURES, dtype=object)
+    dados= np.vstack(dadosParticinado)
+    
+    calculo_modulo(dados)
+    FEATURES = np.array(FEATURES, dtype=object)
     
     #representacao_grafica()
     
@@ -896,31 +851,41 @@ if __name__ == "__main__":
     #4.1 (Significância estatística)
     #sig_est(FEATURES)
     
-    #4.2 (Extrair as features)
-    #vetor_features = feature_extraction(dados)
-    #vetor_features = np.vstack(vetor_features)
+    #4.2 (Extrair as features) considerando somente dados de divice 1
+    dadosParticinadoUpdated = []
+    for sub in dadosParticinado:
+        arr = np.array(sub)
+        dadosParticinadoUpdated.append(arr[arr[:, 0] == '1'])
+    dadosParticinadoUpdated = np.array(dadosParticinadoUpdated, dtype=object)
     
+    
+    vetor_features = feature_extraction(dadosParticinadoUpdated,None)
+    vetor_features = np.vstack(vetor_features)
+    
+    np.save("cache_vetor_features.npy", vetor_features) #Guardar em cache
+    
+    print("FEATURES GUARDADAS")
+
     #4.3 e 4.4 (PCA)
-    #aplicar_pca(vetor_features)
+    PCA_data=aplicar_pca(vetor_features)
     
-    #print("\n")
+    print("\n")
     
     #4.5 e 4.6 (fisher_score e reliefF)
-    #f_scores = fisher_score(vetor_features)
-    #print(f_scores[0])
-    #print("Ficher Scores: ", f_scores)
+    f_scores = fisher_score(vetor_features)
+    print(f_scores[0])
+    print("Ficher Scores: ", f_scores)
     
-    #print("\n")
+    print("\n")
     
-    #pesos = reliefF(vetor_features, 5)
-    #print("Pesos ReliefF: ", pesos)
+    pesos = reliefF(vetor_features, 5)
+    print("Pesos ReliefF: ", pesos)
     
-    #print("\n")
+    print("\n")
     
-    #dez_melhores_features(pesos, f_scores)
-    
+    dez_melhores_features(pesos,f_scores)
+    """
     ############################################################## META 2 #########################################################################
-    
     # 1.1 Balanço entre quantidade de amostras das atividades
     col_atividades = dados[:, -1].astype(float)
     dados_filtrados = dados[col_atividades <= 7].astype(float)
@@ -932,7 +897,9 @@ if __name__ == "__main__":
         dados_filtrados, atividades_atualizada, amostras_sinteticas = smote(dados_filtrados, contagens, atividade = i, num_vizinhos = 5)
     atividades, contagens = verificar_balanceamento(dados_filtrados)
     
-    vetor_features = np.load("cache_vetor_features.npy", allow_pickle=True) 
+
+    
+    vetor_features = np.load("cache_vetor_features.npy", allow_pickle=True)
     #2.1
     embedding= retrive_embedding()
     print(embedding.shape)
