@@ -675,7 +675,57 @@ def dez_melhores_features():
 
 ############################################################## META 2 #########################################################################
 
+def verificar_balanceamento(dados):
+    # Contar as ocorrências
+    atividades, contagens = np.unique(dados[:, -1], return_counts=True)
+    
+    # Plot do gráfico de barras
+    plt.bar(atividades, contagens, color='skyblue')
+    plt.xlabel('Atividade')
+    plt.ylabel('Contagem')
+    plt.title('Contagem de Atividades (1 a 7)')
+    plt.show()
 
+    return atividades, contagens
+
+
+def smote(dados, contagens, atividade, num_vizinhos):
+    num_amostras_sinteticas = contagens[0] - contagens[atividade-1] # Insere dados na atividade desejada até que fique com a mesma quantidade de amostras da atividade 1 (a que possue mais amostras)
+    atividades = dados[:, -1]
+    
+    # Filtrar atividade alvo
+    dados_atividade = dados[atividades == atividade]
+    num_amostras = len(dados_atividade)
+    
+    # Ajustar os vizinhos
+    vizinhos = NearestNeighbors(n_neighbors = num_vizinhos).fit(dados_atividade)
+    amostras_sinteticas = []
+    
+    for __ in range(num_amostras_sinteticas):
+        # Escolhe aleatóriamente um ponto
+        idx = np.random.randint(0, num_amostras)
+        x_i = dados_atividade[idx]
+        
+        # Encontra vizinhos e escolhe um aleatoriamente
+        escolhido = vizinhos.kneighbors([x_i], return_distance = False)
+        indice_escolhido = np.random.choice(escolhido[0][1:]) # Evitar o próprio ponto
+        x_escolhido = dados_atividade[indice_escolhido]
+        
+        # Cria um novo ponto (interpolação)
+        diferenca = x_escolhido - x_i
+        gap = np.random.rand() # valor aleatório entre 0 e 1
+        x_novo = x_i + gap * diferenca
+        
+        amostras_sinteticas.append(x_novo)
+    
+    amostras_sinteticas = np.array(amostras_sinteticas)
+    y_novo = np.full(num_amostras_sinteticas, atividade)
+
+    # Junta dados originais + sintéticos
+    dados_atualizado = np.vstack([dados, amostras_sinteticas])
+    atividades_atualizada = np.concatenate([atividades, y_novo])
+
+    return dados_atualizado, atividades_atualizada, amostras_sinteticas
 
 
 if __name__ == "__main__":
@@ -686,8 +736,8 @@ if __name__ == "__main__":
     dados = descarregar_dados()
     
     #3.1
-    calculo_modulo(dados)
-    FEATURES = np.array(FEATURES, dtype=object)
+    #calculo_modulo(dados)
+    #FEATURES = np.array(FEATURES, dtype=object)
     
     #representacao_grafica()
     
@@ -706,27 +756,38 @@ if __name__ == "__main__":
     #sig_est(FEATURES)
     
     #4.2 (Extrair as features)
-    vetor_features = feature_extraction(dados)
-    vetor_features = np.vstack(vetor_features)
+    #vetor_features = feature_extraction(dados)
+    #vetor_features = np.vstack(vetor_features)
     
     #4.3 e 4.4 (PCA)
     #aplicar_pca(vetor_features)
     
-    print("\n")
+    #print("\n")
     
     #4.5 e 4.6 (fisher_score e reliefF)
-    f_scores = fisher_score(vetor_features)
-    print(f_scores[0])
-    print("Ficher Scores: ", f_scores)
+    #f_scores = fisher_score(vetor_features)
+    #print(f_scores[0])
+    #print("Ficher Scores: ", f_scores)
     
-    print("\n")
+    #print("\n")
     
-    pesos = reliefF(vetor_features, 5)
-    print("Pesos ReliefF: ", pesos)
+    #pesos = reliefF(vetor_features, 5)
+    #print("Pesos ReliefF: ", pesos)
     
-    print("\n")
+    #print("\n")
     
-    dez_melhores_features()
+    #dez_melhores_features()
     
     ############################################################## META 2 #########################################################################
+    
+    # 1.1 Balanço entre quantidade de amostras das atividades
+    col_atividades = dados[:, -1].astype(float)
+    dados_filtrados = dados[col_atividades <= 7].astype(float)
+    atividades, contagens = verificar_balanceamento(dados_filtrados)
+    
+    # 1.2 Implementação do método SMOTE
+    for i in range(2, 8):
+        print(i)
+        dados_filtrados, atividades_atualizada, amostras_sinteticas = smote(dados_filtrados, contagens, atividade = i, num_vizinhos = 5)
+    atividades, contagens = verificar_balanceamento(dados_filtrados)
     
