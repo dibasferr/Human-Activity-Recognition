@@ -492,8 +492,11 @@ def aplicar_pca(estrutura, explainability):
     pca.fit_transform(z_scores)
     
     var_exp = pca.explained_variance_ratio_ # Indica quanto cada componente explica da variância total
+    if(explainability != None): return var_exp #devolve o resultado para a operação de split
+    
     cum_var_exp = np.cumsum(var_exp)
 
+    """
     # ---------- PLOTS ----------
     plt.figure(figsize=(12,5))
 
@@ -518,7 +521,8 @@ def aplicar_pca(estrutura, explainability):
 
     plt.tight_layout()
     plt.show()
-
+    """
+    
     # ---------- RESULTADOS ----------
     print("Variância explicada por componente:", np.round(var_exp, 4))
     print("\nVariância acumulada:", np.round(cum_var_exp, 4))
@@ -526,11 +530,9 @@ def aplicar_pca(estrutura, explainability):
     # índice da primeira vez que a variância acumulada >= 0.75 by default
     num_dim=0
     #alterado para a segunda meta
-    if explainability is None:
-        num_dim = np.argmax(cum_var_exp >= 0.75) + 1
-        print("Número de dimensões necessárias para 75% da variância:", num_dim)
-    else:
-        num_dim = np.argmax(cum_var_exp >= explainability) + 1
+    
+    num_dim = np.argmax(cum_var_exp >= 0.75) + 1
+    print("Número de dimensões necessárias para 75% da variância:", num_dim)
         
         
     # Projetando os dados originais nas 'num_dim' primeiras componentes
@@ -539,7 +541,7 @@ def aplicar_pca(estrutura, explainability):
 
     # Exemplo: pegar features reduzidas da primeira amostra
     sample_index = 0
-    print("Features reduzidas da primeira amostra:", X_reduced[sample_index])
+    #print("Features reduzidas da primeira amostra:", X_reduced[sample_index])
     
     labels = np.array(estrutura[:, -2:], dtype=float)
     X_reduced = np.hstack([X_reduced, labels])
@@ -705,12 +707,11 @@ def split_data_intraSubj(subj):
         #NOTA: COM random_state FIXO A DISTRIBUIÇÃO É SEMPRE IGUAL
         # penultima coluna refere-se a atividade e a ultima é a pessoa em causa
         
-        ############################################ SPLIT EMBEDDING ##############################################
         mask = embedding[:,-1] == subj  # dados dessa pessoa
-    
         X_subj = embedding[mask]
         y_subj = embedding[:,-2][mask]
         
+        ############################################ SPLIT ##############################################
         # 60% treino, 40% resto
         X_train_s, X_temp, y_train_s, y_temp = train_test_split(
             X_subj, y_subj, test_size=0.4, random_state=42+i, shuffle=True)
@@ -719,7 +720,30 @@ def split_data_intraSubj(subj):
         X_val_s, X_test_s, y_val_s, y_test_s = train_test_split(
             X_temp, y_temp, test_size=0.5, random_state=42+i, shuffle=True)
         
+        ############################################ SPLIT FEITO ##############################################
+        # X_train_s  X_val_s X_test_s 
+        # y_train_s  y_val_s y_test_s
+        ########################################## TREINO EMBEDDINGS SEM REDUCAO #################################
+       
         #FAZER TREINO
+        ########################################## TREINO EMBEDDINGS COM PCA #################################
+        
+        # índice da primeira vez que a variância acumulada >= 0.90 by default
+        num_dim=0
+        #alterado para a segunda meta
+        pesos_PCA= aplicar_pca(X_train, 0.90)
+        num_dim = np.argmax(pesos_PCA >= 0.90) + 1
+        
+        pca_reduced = PCA(n_components=num_dim)
+        
+        X_train_s = pca_reduced.fit_transform(X_train_s)
+        X_val_s = pca_reduced.fit_transform(X_val_s)
+        X_test_s = pca_reduced.fit_transform(X_test_s)
+        
+        #FAZER TREINO
+        ########################################################################################################
+        
+        
         ####################################### EMBEDDING RELIEFF ######################################################
         pesos= reliefF(X_subj,5) #5 numero provisorio
         top15= quinze_melhores_features(pesos)
