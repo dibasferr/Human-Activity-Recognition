@@ -640,7 +640,7 @@ def quinze_melhores_features(pesos):
 ############################################################## META 2 #########################################################################
 def verificar_balanceamento(dados):
     # Contar as ocorrências
-    atividades, contagens = np.unique(dados[:, -1], return_counts=True)
+    atividades, contagens = np.unique(dados[:, -2], return_counts=True)
     
     # Plot do gráfico de barras
     plt.bar(atividades, contagens, color='skyblue')
@@ -653,7 +653,7 @@ def verificar_balanceamento(dados):
 
 
 def smote(dados, num_amostras_sinteticas, atividade, num_vizinhos):
-    atividades = dados[:, -1]
+    atividades = dados[:, -2]
     
     # Filtrar atividade alvo
     dados_atividade = dados[atividades == atividade]
@@ -694,7 +694,7 @@ def plot_data_augmentation(dados_participante, amostras_sinteticas):
     plt.figure(figsize=(8, 6))
 
     # (1) Plot de todas as atividades originais (exceto sínteticos)
-    atividades_originais = dados_participante[:, -1]
+    atividades_originais = dados_participante[:, -2]
 
     for ativ in np.unique(atividades_originais):
         mask = atividades_originais == ativ
@@ -710,15 +710,15 @@ def plot_data_augmentation(dados_participante, amostras_sinteticas):
     plt.scatter(
         amostras_sinteticas[:, 0],
         amostras_sinteticas[:, 1],
-        color='red',
+        color='black',
         marker='x',
         s=80,
         linewidths=2,
         label='Sintéticas (SMOTE)'
     )
 
-    plt.xlabel("Feature 1")
-    plt.ylabel("Feature 2")
+    plt.xlabel("Feature 1 (Média do Acelerômetro)")
+    plt.ylabel("Feature 2 (Média do Giroscópio)")
     plt.title("SMOTE - 3 amostras sintéticas\nAtividade 4 do Participante 3")
     plt.legend()
     plt.grid(True)
@@ -1060,15 +1060,15 @@ if __name__ == "__main__":
     """
     ############################################################## META 2 #########################################################################
     
+    vetor_features = np.load("cache_vetor_features.npy", allow_pickle=True)
+    
     # 1.1 Balanço entre quantidade de amostras das atividades
-    col_atividades = dados[:, -1].astype(float)
-    dados_filtrados = dados[col_atividades <= 7].astype(float)
-    #atividades, contagens = verificar_balanceamento(dados_filtrados)
+    #atividades, contagens = verificar_balanceamento(vetor_features)
     
     # 1.2 Implementação do método SMOTE
     # Esse bloco realiza o balancemanto da quantidade dos dados, ele deixa as atividades 2 a 7 com a mesma quantidade de dados da atividade 1
+    #dados_filtrados = vetor_features
     #for i in range(2, 8):
-        #print(i)
         #num_amostras_sinteticas = contagens[0] - contagens[i-1] # Insere dados na atividade desejada até que fique com a mesma quantidade de amostras da atividade 1 (a que possue mais amostras)
         #dados_filtrados, atividades_atualizada, amostras_sinteticas = smote(dados_filtrados, num_amostras_sinteticas, atividade = i, num_vizinhos = 5)
     #atividades, contagens = verificar_balanceamento(dados_filtrados)
@@ -1076,15 +1076,11 @@ if __name__ == "__main__":
     # 1.3 Gerar e visualizar 3 amostras da atividade 4 para o particapante 3
     num_amostras = 3
     atividade = 4
-    dados_participante_3 = np.array(dadosParticinado[2], dtype=float)
-    colunas_participante_3 = dados_participante_3[:, -1]
-    dados_participante_3 = dados_participante_3[colunas_participante_3 <= 7]
+    dados_participante_3 = vetor_features[vetor_features[:, -1] == 3]
     #dados_filtrados, atividades_atualizada, amostras_sinteticas = smote(dados_participante_3, num_amostras, atividade, num_vizinhos = 5)
     
     #plot_data_augmentation(dados_participante_3, amostras_sinteticas)
     
-    
-    vetor_features = np.load("cache_vetor_features.npy", allow_pickle=True)
     
     #2.1
     embeddings = retrive_embedding()
