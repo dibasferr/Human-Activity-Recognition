@@ -1,12 +1,12 @@
 import numpy as np, matplotlib.pyplot as plt
 import csv
-import time
 from scipy import stats
 from scipy.stats import kstest
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 from embeddings_extractor import embedding_main
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 MAX_REPS= 42
 SWITCH_VALUE=3
@@ -652,8 +652,7 @@ def verificar_balanceamento(dados):
     return atividades, contagens
 
 
-def smote(dados, contagens, atividade, num_vizinhos):
-    num_amostras_sinteticas = contagens[0] - contagens[atividade-1] # Insere dados na atividade desejada até que fique com a mesma quantidade de amostras da atividade 1 (a que possue mais amostras)
+def smote(dados, num_amostras_sinteticas, atividade, num_vizinhos):
     atividades = dados[:, -1]
     
     # Filtrar atividade alvo
@@ -690,6 +689,41 @@ def smote(dados, contagens, atividade, num_vizinhos):
 
     return dados_atualizado, atividades_atualizada, amostras_sinteticas
 
+# Plotar resultado 1.3
+def plot_data_augmentation(dados_participante, amostras_sinteticas):
+    plt.figure(figsize=(8, 6))
+
+    # (1) Plot de todas as atividades originais (exceto sínteticos)
+    atividades_originais = dados_participante[:, -1]
+
+    for ativ in np.unique(atividades_originais):
+        mask = atividades_originais == ativ
+        plt.scatter(
+            dados_participante[mask, 0],   # primeira feature
+            dados_participante[mask, 1],   # segunda feature
+            label=f"Atividade {int(ativ)}",
+            alpha=1,
+            s=15
+        )
+
+    # (2) Plot das amostras sintéticas
+    plt.scatter(
+        amostras_sinteticas[:, 0],
+        amostras_sinteticas[:, 1],
+        color='red',
+        marker='x',
+        s=80,
+        linewidths=2,
+        label='Sintéticas (SMOTE)'
+    )
+
+    plt.xlabel("Feature 1")
+    plt.ylabel("Feature 2")
+    plt.title("SMOTE - 3 amostras sintéticas\nAtividade 4 do Participante 3")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
 
 #2.1 
 def retrive_embedding():
@@ -697,8 +731,6 @@ def retrive_embedding():
 
 #3.1
 def split_data_intraSubj(subj):
-    
-    
     #Escolher o K
     #Fazer para varios K's e determinar o melhor K 
     
@@ -845,17 +877,135 @@ def split_data_intraSubj(subj):
             X_temp, y_temp, test_size=0.5, random_state=42+i, shuffle=True)
         #FAZER TREINO
        
+       
+#3.1. Pedro
+def split_para_cada_sujeito(dataset):
+    idx_train = []
+    idx_val = []
+    idx_test = []
+    
+    features = dataset[:, :-2]
+    atividades = dataset[:, -2]
+    participantes = dataset[:, -1]
+    
+    id_unicos = np.unique(participantes)
+    
+    for i in id_unicos:
+        # índices desse participante
+        idx = np.where(participantes == i)[0]
+
+        # 60% treino, 40% resto
+        idx_treino, idx_resto = train_test_split(
+            idx, test_size = 0.4, shuffle=True
+        )
+
+        # 20/20 split do restante (validação e teste)
+        idx_validacao, idx_teste = train_test_split(
+            idx_resto, test_size = 0.5, shuffle=True
+        )
+
+        idx_train.extend(idx_treino)
+        idx_val.extend(idx_validacao)
+        idx_test.extend(idx_teste)
+
+    return (
+        features[idx_train], atividades[idx_train],
+        features[idx_val], atividades[idx_val],
+        features[idx_test], atividades[idx_test]
+    )
+    
+  
+def split_entre_sujeitos(dataset):
+    idx_train = []
+    idx_val = []
+    idx_test = []
+    
+    features = dataset[:, :-2]
+    atividades = dataset[:, -2]
+    participantes = dataset[:, -1]
+    
+    id_unicos = np.unique(participantes)
+    
+    idx_treino = id_unicos[:9]
+    idx_validacao   = id_unicos[9:12]
+    idx_teste  = id_unicos[12:15]
+
+    idx_train = np.isin(participantes, idx_treino)
+    idx_val   = np.isin(participantes, idx_validacao)
+    idx_test  = np.isin(participantes, idx_teste)
+    
+    return (
+        features[idx_train], atividades[idx_train],
+        features[idx_val], atividades[idx_val],
+        features[idx_test], atividades[idx_test]
+    )
+    
+    
+def preparar_datasets(X_train, X_val, X_test, y_train, y_val, y_test):
+    # X - features, y - atividades
+    
+    # 1 - ALL FEATURES
+    all_treino = X_train.copy()
+    all_validacao   = X_val.copy()
+    all_teste  = X_test.copy()
+    
+    
+    # 2 - PCA (90% variance)
+    # Normalização - usamos o .fit_transform apenas no treino pois o scaler e PCA calculam a média, desvio padrão e componentes só no treino.
+    # Validação e teste nunca são usados para ajustar nada, apenas são transformados usando os parâmetros aprendidos no treino.
+    scaler_pca = StandardScaler()
+    X_treino_norm = scaler_pca.fit_transform(X_train)
+    X_validacao_norm   = scaler_pca.transform(X_val)
+    X_teste_norm  = scaler_pca.transform(X_test)
+    
+    # PCA (90%)
+    pca = PCA(n_components=0.90)
+    X_treino_pca = pca.fit_transform(X_treino_norm)
+    X_validacao_pca   = pca.transform(X_validacao_norm)
+    X_teste_pca  = pca.transform(X_teste_norm)
+    
+    
+    # 3 - ReliefF (top 15 features) 
+    # Normalização novamente (não compartilhar scaler com PCA)
+    scaler_relief = StandardScaler()
+    X_treino_norm_r = scaler_relief.fit_transform(X_train)
+    X_validacao_norm_r   = scaler_relief.transform(X_val)
+    X_teste_norm_r  = scaler_relief.transform(X_test)
+    
+    # Concatenamos as colunas das atividades no final do array pois a função reliefF que desenvolvemos utiliza essa formatação
+    X_treino_norm_r_conc = np.concatenate((X_treino_norm_r, y_train.reshape(-1, 1)), axis = 1)
+    
+    # ReliefF
+    pesos = reliefF(X_treino_norm_r_conc, 5)
+    
+    # índices das 15 melhores features
+    top_features = quinze_melhores_features(pesos)
+    
+    # aplicar seleção
+    X_treino_relief = X_treino_norm_r[:, top_features]
+    X_validacao_relief   = X_validacao_norm_r[:, top_features]
+    X_teste_relief  = X_teste_norm_r[:, top_features]
+    
+    
+    return {
+        "all":     (all_treino, all_validacao, all_teste),
+        "pca":     (X_treino_pca, X_validacao_pca, X_teste_pca),
+        "relief":  (X_treino_relief, X_validacao_relief, X_teste_relief),
+        "relief_idx": top_features,   # para registrar as colunas escolhidas
+    }
+         
+    
 ###################################################################################################################################################
 
 if __name__ == "__main__":
-    """
     ############################################################## META 1 #########################################################################
     #2
     dadosParticinado = descarregar_dados()
     
     #3.1
-    dados= np.vstack(dadosParticinado)
+    dados = np.vstack(dadosParticinado)
     
+    """
     calculo_modulo(dados)
     FEATURES = np.array(FEATURES, dtype=object)
     
@@ -879,11 +1029,10 @@ if __name__ == "__main__":
     dadosParticinadoUpdated = []
     for sub in dadosParticinado:
         arr = np.array(sub)
-        dadosParticinadoUpdated.append(arr[arr[:, 0] == '1'])
+        dadosParticinadoUpdated.append(arr[(arr[:, 0].astype(int) == 1) & (arr[:, -1].astype(int) <= 7)]) # Exclui as atividades superiores a 7
     dadosParticinadoUpdated = np.array(dadosParticinadoUpdated, dtype=object)
-    
-    
-    vetor_features = feature_extraction(dadosParticinadoUpdated,None)
+
+    vetor_features = feature_extraction(dadosParticinadoUpdated)
     vetor_features = np.vstack(vetor_features)
     
     np.save("cache_vetor_features.npy", vetor_features) #Guardar em cache
@@ -910,33 +1059,75 @@ if __name__ == "__main__":
     dez_melhores_features(pesos,f_scores)
     """
     ############################################################## META 2 #########################################################################
+    
     # 1.1 Balanço entre quantidade de amostras das atividades
     col_atividades = dados[:, -1].astype(float)
     dados_filtrados = dados[col_atividades <= 7].astype(float)
-    atividades, contagens = verificar_balanceamento(dados_filtrados)
+    #atividades, contagens = verificar_balanceamento(dados_filtrados)
     
     # 1.2 Implementação do método SMOTE
-    for i in range(2, 8):
-        print(i)
-        dados_filtrados, atividades_atualizada, amostras_sinteticas = smote(dados_filtrados, contagens, atividade = i, num_vizinhos = 5)
-    atividades, contagens = verificar_balanceamento(dados_filtrados)
+    # Esse bloco realiza o balancemanto da quantidade dos dados, ele deixa as atividades 2 a 7 com a mesma quantidade de dados da atividade 1
+    #for i in range(2, 8):
+        #print(i)
+        #num_amostras_sinteticas = contagens[0] - contagens[i-1] # Insere dados na atividade desejada até que fique com a mesma quantidade de amostras da atividade 1 (a que possue mais amostras)
+        #dados_filtrados, atividades_atualizada, amostras_sinteticas = smote(dados_filtrados, num_amostras_sinteticas, atividade = i, num_vizinhos = 5)
+    #atividades, contagens = verificar_balanceamento(dados_filtrados)
     
-
+    # 1.3 Gerar e visualizar 3 amostras da atividade 4 para o particapante 3
+    num_amostras = 3
+    atividade = 4
+    dados_participante_3 = np.array(dadosParticinado[2], dtype=float)
+    colunas_participante_3 = dados_participante_3[:, -1]
+    dados_participante_3 = dados_participante_3[colunas_participante_3 <= 7]
+    #dados_filtrados, atividades_atualizada, amostras_sinteticas = smote(dados_participante_3, num_amostras, atividade, num_vizinhos = 5)
+    
+    #plot_data_augmentation(dados_participante_3, amostras_sinteticas)
+    
     
     vetor_features = np.load("cache_vetor_features.npy", allow_pickle=True)
-    #2.1
-    embedding= retrive_embedding()
-    print(embedding.shape)
     
+    #2.1
+    embeddings = retrive_embedding()
+    
+    ################################ Parte do Lorando #################################
     #3.1
-    X_train, X_val, X_test = [], [], []
-    y_train, y_val, y_test = [], [], []
+    #X_train, X_val, X_test = [], [], []
+    #y_train, y_val, y_test = [], [], []
 
-    for subj in np.unique(embedding[:,-1]):
+    #for subj in np.unique(embedding[:,-1]):
 
-        split_data_intraSubj(subj)
+        #split_data_intraSubj(subj)
         
         #Fazer o mesmo para features
         #E para features e embedding com pca e relieff
-
+        
+        
+    #3.1
+    # Split do primeiro dataset (features)
+    Xf_train, yf_train, Xf_val, yf_val, Xf_test, yf_test = split_para_cada_sujeito(vetor_features)
     
+    # Split do segundo dataset (embeddings)
+    Xe_train, ye_train, Xe_val, ye_val, Xe_test, ye_test = split_para_cada_sujeito(embeddings)
+    
+    #3.2.
+    # Split do primeiro dataset (features)
+    Xf_train2, yf_train2, Xf_val2, yf_val2, Xf_test2, yf_test2 = split_entre_sujeitos(vetor_features)
+    
+    # Split do segundo dataset (embeddings)
+    Xe_train2, ye_train2, Xe_val2, ye_val2, Xe_test2, ye_test2 = split_entre_sujeitos(embeddings)
+    
+    # 3.4.
+    # FEATURES DATASET
+    feat_splits = preparar_datasets(
+        Xf_train, Xf_val, Xf_test,
+        yf_train, yf_val, yf_test
+    )
+
+    # EMBEDDINGS DATASET
+    emb_splits = preparar_datasets(
+        Xe_train, Xe_val, Xe_test,
+        ye_train, ye_val, ye_test
+    )
+    
+    relief_idx = feat_splits["relief_idx"]
+    print(relief_idx)
