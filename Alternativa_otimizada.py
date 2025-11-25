@@ -7,6 +7,14 @@ from sklearn.neighbors import NearestNeighbors
 from embeddings_extractor import embedding_main
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from collections import Counter
+from sklearn.metrics import (
+    confusion_matrix, 
+    accuracy_score, 
+    precision_score, 
+    recall_score, 
+    f1_score
+)
 
 MAX_REPS= 42
 SWITCH_VALUE=3
@@ -729,8 +737,7 @@ def plot_data_augmentation(dados_participante, amostras_sinteticas):
 def retrive_embedding():
     return embedding_main()
 
-    
-#3.1. Pedro
+
 def split_para_cada_sujeito(dataset):
     idx_train = []
     idx_val = []
@@ -846,7 +853,39 @@ def preparar_datasets(X_train, X_val, X_test, y_train, y_val, y_test):
         "relief_idx": top_features,   # para registrar as colunas escolhidas
     }
          
+
+class K_Nearest_Neighbors:
+    def __init__(self, k):
+        self.k = k
+        self.X_train = None
+        self.y_train = None
+
+    def fit(self, X, y):
+        self.X_train = X
+        self.y_train = y
     
+    def predict_one(self, x):
+        distancias = np.linalg.norm(self.X_train - x, axis=1) # calcula as distâncias entre x e todos os pontos do treino
+        k_idx = np.argsort(distancias)[:self.k] # ordena a distância do menor para o maior e pega apenas as k primeiras distâncias
+        k_labels = self.y_train[k_idx]
+        return Counter(k_labels).most_common(1)[0][0] # retorna a classe que aparece mais vezes entre os vizinhos
+    
+    def predict(self, X):
+        return np.array([self.predict_one(x) for x in X])
+    
+
+def avaliar_modelo(y_true, y_pred):
+    resultados = {}
+
+    resultados["confusion_matrix"] = confusion_matrix(y_true, y_pred)
+    resultados["accuracy"] = accuracy_score(y_true, y_pred)
+    resultados["precision_macro"] = precision_score(y_true, y_pred, average='macro', zero_division=0)
+    resultados["recall_macro"] = recall_score(y_true, y_pred, average='macro', zero_division=0)
+    resultados["f1_macro"] = f1_score(y_true, y_pred, average='macro', zero_division=0)
+
+    return resultados
+
+
 ###################################################################################################################################################
 
 if __name__ == "__main__":
@@ -913,6 +952,7 @@ if __name__ == "__main__":
     ############################################################## META 2 #########################################################################
     
     vetor_features = np.load("cache_vetor_features.npy", allow_pickle=True)
+    vetor_features = vetor_features.astype(float)
     
     # 1.1 Balanço entre quantidade de amostras das atividades
     #atividades, contagens = verificar_balanceamento(vetor_features)
@@ -958,7 +998,7 @@ if __name__ == "__main__":
     Xe_train, ye_train, Xe_val, ye_val, Xe_test, ye_test = split_para_cada_sujeito(embeddings)
     
     #3.2.
-    # Split do primeiro dataset (features)
+    # Split do primeiro dataset (features)  
     Xf_train2, yf_train2, Xf_val2, yf_val2, Xf_test2, yf_test2 = split_entre_sujeitos(vetor_features)
     
     # Split do segundo dataset (embeddings)
@@ -977,5 +1017,12 @@ if __name__ == "__main__":
         ye_train, ye_val, ye_test
     )
     
-    relief_idx = feat_splits["relief_idx"]
-    print(relief_idx)
+    #relief_idx = feat_splits["relief_idx"]
+    #print(relief_idx)
+    
+    #4.1.
+    knn = K_Nearest_Neighbors(k = 5)
+    knn.fit(Xe_train, ye_train)
+    y_pred = knn.predict(Xe_val)
+    metricas = avaliar_modelo(ye_val, y_pred)
+    print(metricas)
