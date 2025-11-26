@@ -868,10 +868,34 @@ class K_Nearest_Neighbors:
         distancias = np.linalg.norm(self.X_train - x, axis=1) # calcula as distâncias entre x e todos os pontos do treino
         k_idx = np.argsort(distancias)[:self.k] # ordena a distância do menor para o maior e pega apenas as k primeiras distâncias
         k_labels = self.y_train[k_idx]
-        return Counter(k_labels).most_common(1)[0][0] # retorna a classe que aparece mais vezes entre os vizinhos
+        
+        # Contar classe que aparece mais vezes
+        label_count = {}
+        for label in k_labels:
+            if label not in label_count:
+                label_count[label] = 1
+            else:
+                label_count[label] += 1
+
+        # Encontrar classe mais frequente
+        mais_frequente = None
+        maior_contagem = -1
+
+        for label, count in label_count.items():
+            if count > maior_contagem:
+                maior_contagem = count
+                mais_frequente = label
+        
+        return mais_frequente
     
     def predict(self, X):
-        return np.array([self.predict_one(x) for x in X])
+        X = np.asarray(X, dtype=float)
+        previsoes = np.array(len(X), dtype=self.y_train.dtype)
+
+        for i in range(len(X)):
+            previsoes[i] = self.predict_one(X[i])
+
+        return previsoes
     
 
 def avaliar_modelo(y_true, y_pred):
@@ -1021,6 +1045,12 @@ if __name__ == "__main__":
     #print(relief_idx)
     
     #4.1.
+    knn = K_Nearest_Neighbors(k = 5)
+    knn.fit(Xf_train, yf_train)
+    y_pred = knn.predict(Xf_val)
+    metricas = avaliar_modelo(yf_val, y_pred)
+    print(metricas)
+    
     knn = K_Nearest_Neighbors(k = 5)
     knn.fit(Xe_train, ye_train)
     y_pred = knn.predict(Xe_val)
