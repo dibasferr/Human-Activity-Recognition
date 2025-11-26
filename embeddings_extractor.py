@@ -121,7 +121,7 @@ def embedding_main():
 
   # concatenar embeddings + atividade + pessoa
   embeddings_with_labels = np.concatenate([np.squeeze(embeddings), activities_arr, person_arr], axis=1)
-
-  return embeddings_with_labels #penultima coluna atividade, ultima é a pessoa
   
+  embedding_updated = embeddings_with_labels[embeddings_with_labels[:, -2] <= 7]
 
+  return embedding_updated #penultima coluna atividade, ultima é a pessoa
