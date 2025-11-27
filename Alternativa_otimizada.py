@@ -800,7 +800,7 @@ def split_entre_sujeitos(dataset):
     )
     
     
-def preparar_datasets(X_train, X_val, X_test, y_train, y_val, y_test):
+def preparar_datasets(X_train, X_val, X_test, y_train):
     # X - features, y - atividades
     
     # 1 - ALL FEATURES
@@ -850,7 +850,7 @@ def preparar_datasets(X_train, X_val, X_test, y_train, y_val, y_test):
         "all":     (all_treino, all_validacao, all_teste),
         "pca":     (X_treino_pca, X_validacao_pca, X_teste_pca),
         "relief":  (X_treino_relief, X_validacao_relief, X_teste_relief),
-        "relief_idx": top_features,   # para registrar as colunas escolhidas
+        "relief_idx": top_features   # para registrar as colunas escolhidas
     }
          
 
@@ -890,7 +890,7 @@ class K_Nearest_Neighbors:
     
     def predict(self, X):
         X = np.asarray(X, dtype=float)
-        previsoes = np.array(len(X), dtype=self.y_train.dtype)
+        previsoes = np.empty(len(X), dtype=self.y_train.dtype)
 
         for i in range(len(X)):
             previsoes[i] = self.predict_one(X[i])
@@ -903,11 +903,69 @@ def avaliar_modelo(y_true, y_pred):
 
     resultados["confusion_matrix"] = confusion_matrix(y_true, y_pred)
     resultados["accuracy"] = accuracy_score(y_true, y_pred)
-    resultados["precision_macro"] = precision_score(y_true, y_pred, average='macro', zero_division=0)
-    resultados["recall_macro"] = recall_score(y_true, y_pred, average='macro', zero_division=0)
-    resultados["f1_macro"] = f1_score(y_true, y_pred, average='macro', zero_division=0)
+    resultados["precision"] = precision_score(y_true, y_pred, average='macro', zero_division=0)
+    resultados["recall"] = recall_score(y_true, y_pred, average='macro', zero_division=0)
+    resultados["f1_score"] = f1_score(y_true, y_pred, average='macro', zero_division=0)
 
     return resultados
+
+
+def escolher_melhor_k(X_train, y_train, X_val, y_val):
+    melhor_k = None
+    melhor_f1_score = -1
+    
+    k_testes = [1,3,5,7,9,11,13,15,17,19,21]
+    
+    for k in k_testes:
+        knn = K_Nearest_Neighbors(k)
+        knn.fit(X_train, y_train)
+        y_pred = knn.predict(X_val)
+        
+        metricas = avaliar_modelo(y_val, y_pred)
+        f1_score = metricas["f1_score"]
+        
+        if f1_score > melhor_f1_score:
+            melhor_f1_score = f1_score
+            melhor_k = k
+    
+    return melhor_k
+
+
+def avaliar_teste(X_train, y_train, X_test, y_test, k):
+    knn = K_Nearest_Neighbors(k)
+    knn.fit(X_train, y_train)
+    y_pred = knn.predict(X_test)
+    metricas = avaliar_modelo(y_test, y_pred)
+    return metricas
+
+
+def avaliar_dataset(modelo, y_train, y_val, y_test):
+    resultado_final = {}
+    
+    #for nome, (X_train, X_val, X_test) in splits.items():
+        #if nome == "relief_idx":
+            #continue
+        
+    X_train = modelo[0]
+    X_val = modelo[1]
+    X_test = modelo[2]
+        
+    melhor_k = escolher_melhor_k(X_train, y_train, X_val, y_val)
+
+    metricas_teste = avaliar_teste(
+        np.vstack((X_train, X_val)),
+        np.concatenate((y_train, y_val)),
+        X_test,
+        y_test,
+        melhor_k
+    )
+
+    resultado_final = {
+        "melhor_k": melhor_k,
+        "metricas_test": metricas_teste
+    }
+    
+    return resultado_final
 
 
 ###################################################################################################################################################
@@ -1001,19 +1059,6 @@ if __name__ == "__main__":
     #2.1
     embeddings = retrive_embedding()
     
-    ################################ Parte do Lorando #################################
-    #3.1
-    #X_train, X_val, X_test = [], [], []
-    #y_train, y_val, y_test = [], [], []
-
-    #for subj in np.unique(embedding[:,-1]):
-
-        #split_data_intraSubj(subj)
-        
-        #Fazer o mesmo para features
-        #E para features e embedding com pca e relieff
-        
-        
     #3.1
     # Split do primeiro dataset (features)
     Xf_train, yf_train, Xf_val, yf_val, Xf_test, yf_test = split_para_cada_sujeito(vetor_features)
@@ -1031,28 +1076,107 @@ if __name__ == "__main__":
     # 3.4.
     # FEATURES DATASET
     feat_splits = preparar_datasets(
-        Xf_train, Xf_val, Xf_test,
-        yf_train, yf_val, yf_test
+        Xf_train, Xf_val, Xf_test, yf_train
+    )
+    
+    feat_splits2 = preparar_datasets(
+        Xf_train2, Xf_val2, Xf_test2, yf_train2
     )
 
     # EMBEDDINGS DATASET
     emb_splits = preparar_datasets(
-        Xe_train, Xe_val, Xe_test,
-        ye_train, ye_val, ye_test
+        Xe_train, Xe_val, Xe_test, ye_train
     )
     
-    #relief_idx = feat_splits["relief_idx"]
-    #print(relief_idx)
+    emb_splits2 = preparar_datasets(
+        Xe_train2, Xe_val2, Xe_test2, ye_train2
+    )
+
     
-    #4.1.
-    knn = K_Nearest_Neighbors(k = 5)
-    knn.fit(Xf_train, yf_train)
-    y_pred = knn.predict(Xf_val)
-    metricas = avaliar_modelo(yf_val, y_pred)
-    print(metricas)
+    #4.1. e 4.2.
+    #knn = K_Nearest_Neighbors(k = 5)
+    #knn.fit(Xf_train, yf_train)
+    #y_pred = knn.predict(Xf_val)
+    #metricas = avaliar_modelo(yf_val, y_pred)
+    #print(metricas)
     
-    knn = K_Nearest_Neighbors(k = 5)
-    knn.fit(Xe_train, ye_train)
-    y_pred = knn.predict(Xe_val)
-    metricas = avaliar_modelo(ye_val, y_pred)
-    print(metricas)
+    #knn = K_Nearest_Neighbors(k = 5)
+    #knn.fit(Xe_train, ye_train)
+    #y_pred = knn.predict(Xe_val)
+    #metricas = avaliar_modelo(ye_val, y_pred)
+    #print(metricas)
+    
+    # 5.1 e 5.2
+    # Realizaremos 12 avaliações para 12 modelos diferentes, pois temos 2 datasets (FEATURES e EMBEDDINGS), 2 splits (para cada sujeito, entre sujeitos) e 3 versões (todos os dados originais, dados com PCA aplicado, dados com ReliefF aplicado)
+    
+    # 1 - Teste do dataset de FEATURES com split feito em CADA pessoa de TODOS os dados (originais)
+    print("\n")
+    resultados = avaliar_dataset(feat_splits["all"], yf_train, yf_val, yf_test) 
+    print(resultados)
+    print("\n")
+    
+    # 2 - Teste do dataset de FEATURES com split feito em CADA pessoa de dados com PCA aplicado
+    print("\n")
+    resultados = avaliar_dataset(feat_splits["pca"], yf_train, yf_val, yf_test) 
+    print(resultados)
+    print("\n")
+    
+    # 3 - Teste do dataset de FEATURES com split feito em CADA pessoa de dados com ReliefF aplicado
+    print("\n")
+    resultados = avaliar_dataset(feat_splits["relief"], yf_train, yf_val, yf_test) 
+    print(resultados)
+    print("\n")
+    
+    # 4 - Teste do dataset de FEATURES com split feito ENTRE pessoas de TODOS os dados (originais)
+    print("\n")
+    resultados = avaliar_dataset(feat_splits2["all"], yf_train2, yf_val2, yf_test2) 
+    print(resultados)
+    print("\n")
+    
+    # 5 - Teste do dataset de FEATURES com split feito ENTRE pessoas de dados com PCA aplicado
+    print("\n")
+    resultados = avaliar_dataset(feat_splits2["pca"], yf_train2, yf_val2, yf_test2) 
+    print(resultados)
+    print("\n")
+    
+    # 6 - Teste do dataset de FEATURES com split feito ENTRE pessoas de dados com ReliefF aplicado
+    print("\n")
+    resultados = avaliar_dataset(feat_splits2["relief"], yf_train2, yf_val2, yf_test2) 
+    print(resultados)
+    print("\n")
+    
+    # 7 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de TODOS os dados (originais)
+    print("\n")
+    resultados = avaliar_dataset(emb_splits["all"], ye_train, ye_val, ye_test) 
+    print(resultados)
+    print("\n")
+    
+    # 8 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de dados com PCA aplicado
+    print("\n")
+    resultados = avaliar_dataset(emb_splits["pca"], ye_train, ye_val, ye_test) 
+    print(resultados)
+    print("\n")
+    
+    # 9 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de dados com ReliefF aplicado
+    print("\n")
+    resultados = avaliar_dataset(emb_splits["relief"], ye_train, ye_val, ye_test) 
+    print(resultados)
+    print("\n")
+    
+    # 10 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de TODOS os dados (originais)
+    print("\n")
+    resultados = avaliar_dataset(emb_splits2["all"], ye_train2, ye_val2, ye_test2) 
+    print(resultados)
+    print("\n")
+    
+    # 11 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de dados com PCA aplicado
+    print("\n")
+    resultados = avaliar_dataset(emb_splits2["pca"], ye_train2, ye_val2, ye_test2) 
+    print(resultados)
+    print("\n")
+    
+    # 12 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de dados com ReliefF aplicado
+    print("\n")
+    resultados = avaliar_dataset(emb_splits2["relief"], ye_train2, ye_val2, ye_test2) 
+    print(resultados)
+    print("\n")
