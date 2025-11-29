@@ -1,7 +1,21 @@
 #FICHEIRO UTILIZADO PARA GUARDAR IDEIAS ABSURDAS DE CODIGO 
 
 
-
+ #4.1. e 4.2.
+        #knn = K_Nearest_Neighbors(k = 5)
+        #knn.fit(Xf_train, yf_train)
+        #y_pred = knn.predict(Xf_val)
+        #metricas = avaliar_modelo(yf_val, y_pred)
+        #print(metricas)
+        
+        #knn = K_Nearest_Neighbors(k = 5)
+        #knn.fit(Xe_train, ye_train)
+        #y_pred = knn.predict(Xe_val)
+        #metricas = avaliar_modelo(ye_val, y_pred)
+        #print(metricas)
+        
+        
+        
 
 #3.1
 def split_data_intraSubj(subj):

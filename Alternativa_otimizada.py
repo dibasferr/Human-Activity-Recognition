@@ -1,3 +1,4 @@
+import itertools
 import numpy as np, matplotlib.pyplot as plt
 import csv
 from scipy import stats
@@ -738,7 +739,7 @@ def retrive_embedding():
     return embedding_main()
 
 
-def split_para_cada_sujeito(dataset):
+def split_para_cada_sujeito(dataset, randState):
     idx_train = []
     idx_val = []
     idx_test = []
@@ -755,12 +756,12 @@ def split_para_cada_sujeito(dataset):
 
         # 60% treino, 40% resto
         idx_treino, idx_resto = train_test_split(
-            idx, test_size = 0.4, shuffle=True
+            idx, test_size = 0.4, random_state= randState, shuffle=True
         )
 
         # 20/20 split do restante (validação e teste)
         idx_validacao, idx_teste = train_test_split(
-            idx_resto, test_size = 0.5, shuffle=True
+            idx_resto, test_size = 0.5, random_state= randState, shuffle=True
         )
 
         idx_train.extend(idx_treino)
@@ -774,7 +775,7 @@ def split_para_cada_sujeito(dataset):
     )
     
   
-def split_entre_sujeitos(dataset):
+def split_entre_sujeitos(dataset, randState):
     idx_train = []
     idx_val = []
     idx_test = []
@@ -785,9 +786,19 @@ def split_entre_sujeitos(dataset):
     
     id_unicos = np.unique(participantes)
     
-    idx_treino = id_unicos[:9]
+    """idx_treino = id_unicos[:9]
     idx_validacao   = id_unicos[9:12]
-    idx_teste  = id_unicos[12:15]
+    idx_teste  = id_unicos[12:15]"""
+    # 60%(9 participantes) treino, 40% resto
+    idx_treino, idx_resto = train_test_split(
+        id_unicos, test_size = 0.4, random_state= randState, shuffle=True
+    )
+
+    # 3/3 split do restante (validação e teste)
+    idx_validacao, idx_teste = train_test_split(
+        idx_resto, test_size = 0.5, random_state= randState, shuffle=True
+    )
+
 
     idx_train = np.isin(participantes, idx_treino)
     idx_val   = np.isin(participantes, idx_validacao)
@@ -968,9 +979,72 @@ def avaliar_dataset(modelo, y_train, y_val, y_test):
     return resultado_final
 
 
+
+#pode ser da estrategia intra-subject(0) or inter-subjet(1). 
+#Se for intra-subject o valor será adicionado na primeira linha e se for a inter-subject será adicionada na segunda linha
+def dados_De_Analise(estrategia): 
+   
+    for i in range(0,7):
+        # para pessoa 1  
+        indx= np.array(7*[True])
+        indx[i]= False
+        fp = np.sum(resultados["metricas_test"]["confusion_matrix"][indx,i])
+        total=  np.sum(resultados["metricas_test"]["confusion_matrix"][indx,:])
+        
+        matriz_de_fp[estrategia,i] = np.append(matriz_de_fp[estrategia,i] , fp/total)
+        
+    
+    
+    
+
+def melhor_modelo(distributions):#usa matriz_de_resultados
+    # separar colunas
+    c1, c2, c3, c4, c5, c6 = distributions
+
+    # -----------------------
+    # 2) Teste de Friedman
+    # -----------------------
+    stat, p = stats.friedmanchisquare( c1, c2, c3, c4, c5, c6)
+
+    print("=== Teste de Friedman ===")
+    print("Estatística:", stat)
+    print("p-valor:", p)
+
+    # -----------------------
+    # 3) Calcular postos médios -> permite calcular o melhor modelo
+    # -----------------------
+    # rank por linha
+    ranks = np.array([stats.rankdata(col) for col in distributions])
+
+    mean_ranks = ranks.mean(axis=0)
+
+    #=== Postos Médios ===
+    postos_med= []
+    for i, r in enumerate(mean_ranks, start=1):
+        postos_med.append(r)
+        
+    return postos_med.index(max(postos_med))
+
+
+def significance_test(distributions, indx_melhor_modelo):
+   
+    # -----------------------
+    # 3) Pós-hoc Wilcoxon
+    # -----------------------
+
+    print("=== Wilcoxon Pareado (sem correção) ===")
+    for j in range(0,len(distributions)):
+        stat, p = stats.wilcoxon(distributions[indx_melhor_modelo], distributions[j])
+        if(p < 0.05 ):
+            print(f"{models[indx_melhor_modelo]} é significativamente melhor que {models[j]}: ")
+        else: 
+            print(f"{models[indx_melhor_modelo]} não é significativamente melhor que {models[j]}: ")
+    
+    
 ###################################################################################################################################################
 
 if __name__ == "__main__":
+    """
     ############################################################## META 1 #########################################################################
     #2
     dadosParticinado = descarregar_dados()
@@ -978,7 +1052,7 @@ if __name__ == "__main__":
     #3.1
     dados = np.vstack(dadosParticinado)
     
-    """
+    
     calculo_modulo(dados)
     FEATURES = np.array(FEATURES, dtype=object)
     
@@ -1030,8 +1104,10 @@ if __name__ == "__main__":
     print("\n")
     
     dez_melhores_features(pesos,f_scores)
-    """
+
+    vetor_features = np.load("cache_vetor_features.npy", allow_pickle=True)
     ############################################################## META 2 #########################################################################
+    """
     
     vetor_features = np.load("cache_vetor_features.npy", allow_pickle=True)
     vetor_features = vetor_features.astype(float)
@@ -1059,124 +1135,193 @@ if __name__ == "__main__":
     #2.1
     embeddings = retrive_embedding()
     
-    #3.1
-    # Split do primeiro dataset (features)
-    Xf_train, yf_train, Xf_val, yf_val, Xf_test, yf_test = split_para_cada_sujeito(vetor_features)
-    
-    # Split do segundo dataset (embeddings)
-    Xe_train, ye_train, Xe_val, ye_val, Xe_test, ye_test = split_para_cada_sujeito(embeddings)
-    
-    #3.2.
-    # Split do primeiro dataset (features)  
-    Xf_train2, yf_train2, Xf_val2, yf_val2, Xf_test2, yf_test2 = split_entre_sujeitos(vetor_features)
-    
-    # Split do segundo dataset (embeddings)
-    Xe_train2, ye_train2, Xe_val2, ye_val2, Xe_test2, ye_test2 = split_entre_sujeitos(embeddings)
-    
-    # 3.4.
-    # FEATURES DATASET
-    feat_splits = preparar_datasets(
-        Xf_train, Xf_val, Xf_test, yf_train
-    )
-    
-    feat_splits2 = preparar_datasets(
-        Xf_train2, Xf_val2, Xf_test2, yf_train2
-    )
+    lista_de_arrays = [
+    [np.array([]) for _ in range(6)]  # Linha 1
+    for _ in range(2)                 # Repete para 2 linhas
+    ]
 
-    # EMBEDDINGS DATASET
-    emb_splits = preparar_datasets(
-        Xe_train, Xe_val, Xe_test, ye_train
-    )
+    # Converte a lista de listas para um array NumPy de objetos
+    matriz_de_resultados = np.array(lista_de_arrays, dtype=object)
     
-    emb_splits2 = preparar_datasets(
-        Xe_train2, Xe_val2, Xe_test2, ye_train2
-    )
+    
+    lista_de_arrays = [
+    [np.array([]) for _ in range(7)]  # Linha 1
+    for _ in range(4)                 # Repete para 4 linhas (1-> features, 2-> embeddings, 3-> feature selection, 4-> embeddings selection)
+    ]
+    
+    matriz_de_fp = np.array(lista_de_arrays, dtype=object) #matriz que irá guardar informação de falsos positivos
+    
+    
+    for i in range(1,11): #10  repeticoes é um numero razoavel para obter uma distribuicao de cada modelo
+    
+    
+        #3.1
+        # Split do primeiro dataset (features)
+        Xf_train, yf_train, Xf_val, yf_val, Xf_test, yf_test = split_para_cada_sujeito(vetor_features,i)
+        
+        # Split do segundo dataset (embeddings)
+        Xe_train, ye_train, Xe_val, ye_val, Xe_test, ye_test = split_para_cada_sujeito(embeddings,i)
+        
+        #3.2.
+        # Split do primeiro dataset (features)  
+        Xf_train2, yf_train2, Xf_val2, yf_val2, Xf_test2, yf_test2 = split_entre_sujeitos(vetor_features,i)
+        
+        # Split do segundo dataset (embeddings)
+        Xe_train2, ye_train2, Xe_val2, ye_val2, Xe_test2, ye_test2 = split_entre_sujeitos(embeddings,i)
+        
+        # 3.4.
+        # FEATURES DATASET
+        feat_splits = preparar_datasets(
+            Xf_train, Xf_val, Xf_test, yf_train
+        )
+        
+        feat_splits2 = preparar_datasets(
+            Xf_train2, Xf_val2, Xf_test2, yf_train2
+        )
 
+        # EMBEDDINGS DATASET
+        emb_splits = preparar_datasets(
+            Xe_train, Xe_val, Xe_test, ye_train
+        )
+        
+        emb_splits2 = preparar_datasets(
+            Xe_train2, Xe_val2, Xe_test2, ye_train2
+        )
+
+        
+       
+        # 5.1 e 5.2
+        # Realizaremos 12 avaliações para 12 modelos diferentes, pois temos 2 datasets (FEATURES e EMBEDDINGS), 2 splits (para cada sujeito, entre sujeitos) e 3 versões (todos os dados originais, dados com PCA aplicado, dados com ReliefF aplicado)
+        
+        # 1 - Teste do dataset de FEATURES com split feito em CADA pessoa de TODOS os dados (originais)
+        print("\n")
+        resultados = avaliar_dataset(feat_splits["all"], yf_train, yf_val, yf_test)
+        matriz_de_resultados[0,0] = np.append(matriz_de_resultados[0,0], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(0) 
+        
+        #print(resultados)
+        print("\n")
+        
+        # 2 - Teste do dataset de FEATURES com split feito em CADA pessoa de dados com PCA aplicado
+        print("\n")
+        resultados = avaliar_dataset(feat_splits["pca"], yf_train, yf_val, yf_test)
+        matriz_de_resultados[0,1] = np.append(matriz_de_resultados[0,1], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(2) 
+        #print(resultados)
+        print("\n")
+        
+        # 3 - Teste do dataset de FEATURES com split feito em CADA pessoa de dados com ReliefF aplicado
+        print("\n")
+        resultados = avaliar_dataset(feat_splits["relief"], yf_train, yf_val, yf_test) 
+        matriz_de_resultados[0,2] = np.append(matriz_de_resultados[0,2], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(2) 
+        #print(resultados)
+        print("\n")
+        
+        # 4 - Teste do dataset de FEATURES com split feito ENTRE pessoas de TODOS os dados (originais)
+        print("\n")
+        resultados = avaliar_dataset(feat_splits2["all"], yf_train2, yf_val2, yf_test2) 
+        matriz_de_resultados[1,0] = np.append(matriz_de_resultados[1,0], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(0) 
+        #print(resultados)
+        print("\n")
+        
+        # 5 - Teste do dataset de FEATURES com split feito ENTRE pessoas de dados com PCA aplicado
+        print("\n")
+        resultados = avaliar_dataset(feat_splits2["pca"], yf_train2, yf_val2, yf_test2) 
+        matriz_de_resultados[1,1] = np.append(matriz_de_resultados[1,1], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(2)
+        #print(resultados)
+        print("\n")
+        
+        # 6 - Teste do dataset de FEATURES com split feito ENTRE pessoas de dados com ReliefF aplicado
+        print("\n")
+        resultados = avaliar_dataset(feat_splits2["relief"], yf_train2, yf_val2, yf_test2) 
+        matriz_de_resultados[1,2] = np.append(matriz_de_resultados[1,2], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(2)
+        #print(resultados)
+        print("\n")
+        
+        # 7 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de TODOS os dados (originais)
+        print("\n")
+        resultados = avaliar_dataset(emb_splits["all"], ye_train, ye_val, ye_test)
+        matriz_de_resultados[0,3] = np.append(matriz_de_resultados[0,3], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(1)
+        #print(resultados)
+        print("\n")
+        
+        # 8 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de dados com PCA aplicado
+        print("\n")
+        resultados = avaliar_dataset(emb_splits["pca"], ye_train, ye_val, ye_test)
+        matriz_de_resultados[0,4] = np.append(matriz_de_resultados[0,4], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(3)
+        #print(resultados)
+        print("\n")
+        
+        # 9 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de dados com ReliefF aplicado
+        print("\n")
+        resultados = avaliar_dataset(emb_splits["relief"], ye_train, ye_val, ye_test) 
+        matriz_de_resultados[0,5] = np.append(matriz_de_resultados[0,5], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(3)
+        #print(resultados)
+        print("\n")
+        
+        # 10 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de TODOS os dados (originais)
+        print("\n")
+        resultados = avaliar_dataset(emb_splits2["all"], ye_train2, ye_val2, ye_test2)
+        matriz_de_resultados[1,3] = np.append(matriz_de_resultados[1,3], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(1)
+        #print(resultados)
+        print("\n")
+        
+        # 11 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de dados com PCA aplicado
+        print("\n")
+        resultados = avaliar_dataset(emb_splits2["pca"], ye_train2, ye_val2, ye_test2)
+        matriz_de_resultados[1,4] = np.append(matriz_de_resultados[1,4], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(3)
+        #print(resultados)
+        print("\n")
+        
+        # 12 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de dados com ReliefF aplicado
+        print("\n")
+        resultados = avaliar_dataset(emb_splits2["relief"], ye_train2, ye_val2, ye_test2) 
+        matriz_de_resultados[1,4] = np.append(matriz_de_resultados[1,4], resultados["metricas_test"]["accuracy"])
+        dados_De_Analise(3)
+        #print(resultados)
+        print("\n")
     
-    #4.1. e 4.2.
-    #knn = K_Nearest_Neighbors(k = 5)
-    #knn.fit(Xf_train, yf_train)
-    #y_pred = knn.predict(Xf_val)
-    #metricas = avaliar_modelo(yf_val, y_pred)
-    #print(metricas)
+    np.save("matriz_de_resultados.npy", matriz_de_resultados) #Guardar em cache
+    np.save("matriz_de_fp.npy", matriz_de_fp) #Guardar em cache
     
-    #knn = K_Nearest_Neighbors(k = 5)
-    #knn.fit(Xe_train, ye_train)
-    #y_pred = knn.predict(Xe_val)
-    #metricas = avaliar_modelo(ye_val, y_pred)
-    #print(metricas)
+    lista_de_arrays = [
+    [np.array([]) for _ in range(7)]  # Linha 1
+    for _ in range(4)                 # Repete para 4 linhas (1-> features, 2-> embeddings, 3-> feature selection, 4-> embeddings selection)
+    ]
     
-    # 5.1 e 5.2
-    # Realizaremos 12 avaliações para 12 modelos diferentes, pois temos 2 datasets (FEATURES e EMBEDDINGS), 2 splits (para cada sujeito, entre sujeitos) e 3 versões (todos os dados originais, dados com PCA aplicado, dados com ReliefF aplicado)
+    fp_mean= np.array(lista_de_arrays, dtype= object)
     
-    # 1 - Teste do dataset de FEATURES com split feito em CADA pessoa de TODOS os dados (originais)
-    print("\n")
-    resultados = avaliar_dataset(feat_splits["all"], yf_train, yf_val, yf_test) 
-    print(resultados)
-    print("\n")
+    for i in range (0,7):
+        
+        for j in range(0,4):
+            
+            fp_mean[j,i]= np.mean(matriz_de_fp[j,i])
     
-    # 2 - Teste do dataset de FEATURES com split feito em CADA pessoa de dados com PCA aplicado
-    print("\n")
-    resultados = avaliar_dataset(feat_splits["pca"], yf_train, yf_val, yf_test) 
-    print(resultados)
-    print("\n")
+    #fp_mean ira retornar uma matriz com medias de false positives por atividade, 
+    #em que cada linha representa features, embeddings, feature selection e embeddings selection
+    #o que irá permitir concluir quais as atividades mais dificeis de classificar. Irá permitir comparar features e embeddings 
+    #Bem como a relevancia de feature/embeddings selection
     
-    # 3 - Teste do dataset de FEATURES com split feito em CADA pessoa de dados com ReliefF aplicado
-    print("\n")
-    resultados = avaliar_dataset(feat_splits["relief"], yf_train, yf_val, yf_test) 
-    print(resultados)
-    print("\n")
+    models= ["FEATURES", "FEATURES PCA", "FEATURES RELIEFF", "EMBEDDINGS", "EMBEDDINGS PCA", "EMBEDDINGS RELIEFF"]
     
-    # 4 - Teste do dataset de FEATURES com split feito ENTRE pessoas de TODOS os dados (originais)
-    print("\n")
-    resultados = avaliar_dataset(feat_splits2["all"], yf_train2, yf_val2, yf_test2) 
-    print(resultados)
-    print("\n")
+    #Para a estrategia intra-subject
+    dados= matriz_de_resultados[0,:]
+    dados= np.vstack(dados) # matriz com 6 linhas q representam os 6 modelos
     
-    # 5 - Teste do dataset de FEATURES com split feito ENTRE pessoas de dados com PCA aplicado
-    print("\n")
-    resultados = avaliar_dataset(feat_splits2["pca"], yf_train2, yf_val2, yf_test2) 
-    print(resultados)
-    print("\n")
+    idx=melhor_modelo(dados)
     
-    # 6 - Teste do dataset de FEATURES com split feito ENTRE pessoas de dados com ReliefF aplicado
-    print("\n")
-    resultados = avaliar_dataset(feat_splits2["relief"], yf_train2, yf_val2, yf_test2) 
-    print(resultados)
-    print("\n")
+    print(f"==melhor modelo==\n {models[idx]} \n")
     
-    # 7 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de TODOS os dados (originais)
-    print("\n")
-    resultados = avaliar_dataset(emb_splits["all"], ye_train, ye_val, ye_test) 
-    print(resultados)
-    print("\n")
+    significance_test(dados, idx)
     
-    # 8 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de dados com PCA aplicado
-    print("\n")
-    resultados = avaliar_dataset(emb_splits["pca"], ye_train, ye_val, ye_test) 
-    print(resultados)
-    print("\n")
-    
-    # 9 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de dados com ReliefF aplicado
-    print("\n")
-    resultados = avaliar_dataset(emb_splits["relief"], ye_train, ye_val, ye_test) 
-    print(resultados)
-    print("\n")
-    
-    # 10 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de TODOS os dados (originais)
-    print("\n")
-    resultados = avaliar_dataset(emb_splits2["all"], ye_train2, ye_val2, ye_test2) 
-    print(resultados)
-    print("\n")
-    
-    # 11 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de dados com PCA aplicado
-    print("\n")
-    resultados = avaliar_dataset(emb_splits2["pca"], ye_train2, ye_val2, ye_test2) 
-    print(resultados)
-    print("\n")
-    
-    # 12 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de dados com ReliefF aplicado
-    print("\n")
-    resultados = avaliar_dataset(emb_splits2["relief"], ye_train2, ye_val2, ye_test2) 
-    print(resultados)
-    print("\n")
+
+
