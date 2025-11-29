@@ -1289,6 +1289,8 @@ if __name__ == "__main__":
         dados_De_Analise(3)
         #print(resultados)
         print("\n")
+        
+        print(f"{i} split done")
     
     np.save("matriz_de_resultados.npy", matriz_de_resultados) #Guardar em cache
     np.save("matriz_de_fp.npy", matriz_de_fp) #Guardar em cache
