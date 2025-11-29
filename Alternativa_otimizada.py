@@ -1285,7 +1285,7 @@ if __name__ == "__main__":
         # 12 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de dados com ReliefF aplicado
         print("\n")
         resultados = avaliar_dataset(emb_splits2["relief"], ye_train2, ye_val2, ye_test2) 
-        matriz_de_resultados[1,4] = np.append(matriz_de_resultados[1,4], resultados["metricas_test"]["accuracy"])
+        matriz_de_resultados[1,5] = np.append(matriz_de_resultados[1,5], resultados["metricas_test"]["accuracy"])
         dados_De_Analise(3)
         #print(resultados)
         print("\n")
