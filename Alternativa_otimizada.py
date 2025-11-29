@@ -1014,7 +1014,11 @@ def melhor_modelo(distributions):#usa matriz_de_resultados
     # 3) Calcular postos médios -> permite calcular o melhor modelo
     # -----------------------
     # rank por linha
-    ranks = np.array([stats.rankdata(col) for col in distributions])
+    # Criar matriz linha=experimento, coluna=modelo
+    matriz = np.column_stack(distributions)
+
+    # rank por linha
+    ranks = np.array([stats.rankdata(row) for row in matriz])
 
     mean_ranks = ranks.mean(axis=0)
 
@@ -1023,7 +1027,7 @@ def melhor_modelo(distributions):#usa matriz_de_resultados
     for i, r in enumerate(mean_ranks, start=1):
         postos_med.append(r)
         
-    return postos_med.index(max(postos_med))
+    return postos_med.index(min(postos_med))
 
 
 def significance_test(distributions, indx_melhor_modelo):
@@ -1034,6 +1038,8 @@ def significance_test(distributions, indx_melhor_modelo):
 
     print("=== Wilcoxon Pareado (sem correção) ===")
     for j in range(0,len(distributions)):
+        if j == indx_melhor_modelo:
+            continue  # não compara consigo mesmo
         stat, p = stats.wilcoxon(distributions[indx_melhor_modelo], distributions[j])
         if(p < 0.05 ):
             print(f"{models[indx_melhor_modelo]} é significativamente melhor que {models[j]}: ")
