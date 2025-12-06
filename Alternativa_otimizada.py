@@ -996,9 +996,11 @@ def dados_De_Analise(estrategia):
         
  """   
     
-    
+"""  
 
 def melhor_modelo(distributions):#usa matriz_de_resultados
+    #alterar para usar a matriz de accuracy
+    
     # separar colunas
     c1, c2, c3, c4, c5, c6 = distributions
 
@@ -1049,8 +1051,10 @@ def significance_test(distributions, indx_melhor_modelo):
     
     
 ###################################################################################################################################################
+"""
 
 if __name__ == "__main__":
+    
     """
     ############################################################## META 1 #########################################################################
     #2
@@ -1143,23 +1147,15 @@ if __name__ == "__main__":
     embeddings = retrive_embedding()
     
     lista_de_arrays = [
-    [np.array([]) for _ in range(6)]  # Linha 1
+    [np.array([], dtype= object) for _ in range(6)]  # Linha 1
     for _ in range(2)                 # Repete para 2 linhas
     ]
 
     # Converte a lista de listas para um array NumPy de objetos
     matriz_de_resultados = lista_de_arrays
     
-    
-    lista_de_arrays = [
-    [np.array([]) for _ in range(7)]  # Linha 1
-    for _ in range(4)                 # Repete para 4 linhas (1-> features, 2-> embeddings, 3-> feature selection, 4-> embeddings selection)
-    ]
-    
-    matriz_de_fp =lista_de_arrays #matriz que irá guardar informação de falsos positivos
-    
-    
-    for i in range(1,11): #10  repeticoes é um numero razoavel para obter uma distribuicao de cada modelo
+    repeticoes= 11
+    for i in range(1,repeticoes): #10  repeticoes é um numero razoavel para obter uma distribuicao de cada modelo
     
     
         #3.1
@@ -1202,8 +1198,7 @@ if __name__ == "__main__":
         
         # 1 - Teste do dataset de FEATURES com split feito em CADA pessoa de TODOS os dados (originais)
         resultados = avaliar_dataset(feat_splits["all"], yf_train, yf_val, yf_test)
-        matriz_de_resultados[0][0].append(resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(0) 
+        matriz_de_resultados[0][0]= np.append(matriz_de_resultados[0][0], resultados["metricas_test"]["f1_score"])
         
         #print(resultados)
         print("1")
@@ -1211,102 +1206,149 @@ if __name__ == "__main__":
         # 2 - Teste do dataset de FEATURES com split feito em CADA pessoa de dados com PCA aplicado
 
         resultados = avaliar_dataset(feat_splits["pca"], yf_train, yf_val, yf_test)
-        matriz_de_resultados[0][1].append(resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(2) 
+        matriz_de_resultados[0][1]= np.append( matriz_de_resultados[0][1], resultados["metricas_test"]["f1_score"])
+       
         #print(resultados)
         print("2")
         
         # 3 - Teste do dataset de FEATURES com split feito em CADA pessoa de dados com ReliefF aplicado
        
         resultados = avaliar_dataset(feat_splits["relief"], yf_train, yf_val, yf_test) 
-        matriz_de_resultados[0][2].append(resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(2) 
+        matriz_de_resultados[0][2]= np.append(matriz_de_resultados[0][2], resultados["metricas_test"]["f1_score"])
+       
         #print(resultados)
         print("3")
         
         # 4 - Teste do dataset de FEATURES com split feito ENTRE pessoas de TODOS os dados (originais)
         
         resultados = avaliar_dataset(feat_splits2["all"], yf_train2, yf_val2, yf_test2) 
-        matriz_de_resultados[1][0].append(resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(0) 
+        matriz_de_resultados[1][0]= np.append( matriz_de_resultados[1][0], resultados["metricas_test"]["f1_score"])
+     
         #print(resultados)
         print("4")
         
         # 5 - Teste do dataset de FEATURES com split feito ENTRE pessoas de dados com PCA aplicado
       
         resultados = avaliar_dataset(feat_splits2["pca"], yf_train2, yf_val2, yf_test2) 
-        matriz_de_resultados[1][1].append(resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(2)
+        matriz_de_resultados[1][1]= np.append(matriz_de_resultados[1][1], resultados["metricas_test"]["f1_score"])
+       
         #print(resultados)
         print("5")
         
         # 6 - Teste do dataset de FEATURES com split feito ENTRE pessoas de dados com ReliefF aplicado
       
         resultados = avaliar_dataset(feat_splits2["relief"], yf_train2, yf_val2, yf_test2) 
-        matriz_de_resultados[1][2].append( resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(2)
+        matriz_de_resultados[1][2]= np.append(matriz_de_resultados[1][2], resultados["metricas_test"]["f1_score"])
+       
         #print(resultados)
         print("6")
         
         # 7 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de TODOS os dados (originais)
       
         resultados = avaliar_dataset(emb_splits["all"], ye_train, ye_val, ye_test)
-        matriz_de_resultados[0][3].append(resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(1)
+        matriz_de_resultados[0][3]= np.append(matriz_de_resultados[0][3], resultados["metricas_test"]["f1_score"])
+       
         #print(resultados)
         print("7")
         
         # 8 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de dados com PCA aplicado
    
         resultados = avaliar_dataset(emb_splits["pca"], ye_train, ye_val, ye_test)
-        matriz_de_resultados[0][4].append(resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(3)
+        matriz_de_resultados[0][4]= np.append(matriz_de_resultados[0][4], resultados["metricas_test"]["f1_score"])
+       
         #print(resultados)
         print("8")
         
         # 9 - Teste do dataset de EMBEDDINGS com split feito em CADA pessoa de dados com ReliefF aplicado
       
         resultados = avaliar_dataset(emb_splits["relief"], ye_train, ye_val, ye_test) 
-        matriz_de_resultados[0][5].append( resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(3)
+        matriz_de_resultados[0][5]= np.append(matriz_de_resultados[0][5], resultados["metricas_test"]["f1_score"])
+   
         #print(resultados)
         print("9")
         
         # 10 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de TODOS os dados (originais)
        
         resultados = avaliar_dataset(emb_splits2["all"], ye_train2, ye_val2, ye_test2)
-        matriz_de_resultados[1][3].append(resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(1)
+        matriz_de_resultados[1][3]= np.append(matriz_de_resultados[1][3], resultados["metricas_test"]["f1_score"])
+        
         #print(resultados)
         print("10")
         
         # 11 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de dados com PCA aplicado
     
         resultados = avaliar_dataset(emb_splits2["pca"], ye_train2, ye_val2, ye_test2)
-        matriz_de_resultados[1][4].append(resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(3)
+        matriz_de_resultados[1][4]= np.append( matriz_de_resultados[1][4], resultados["metricas_test"]["f1_score"])
+     
         #print(resultados)
         print("11")
         
         # 12 - Teste do dataset de EMBEDDINGS com split feito ENTRE pessoas de dados com ReliefF aplicado
       
         resultados = avaliar_dataset(emb_splits2["relief"], ye_train2, ye_val2, ye_test2) 
-        matriz_de_resultados[1][5].append( resultados["metricas_test"]["accuracy"])
-        dados_De_Analise(3)
+        matriz_de_resultados[1][5]= np.append(matriz_de_resultados[1][5], resultados["metricas_test"]["f1_score"])
+        
         #print(resultados)
         print("12")
-        
         print(f"{i} split done")
     
-    np.save("matriz_de_resultados.npy", matriz_de_resultados) #Guardar em cache
-    np.save("matriz_de_fp.npy", matriz_de_fp) #Guardar em cache
+    
+    np.save("matriz_de_f1Score.npy", matriz_de_resultados) #Guardar em cache
     """
+    matrix=np.load("matriz_de_resultados.npy",allow_pickle=True) #Guardar em cache
     
-    matriz_de_fp = np.load("matriz_de_fp.npy", allow_pickle=True)
-    matriz_de_resultados= np.load("matriz_de_resultados.npy", allow_pickle=True)
+    #Para observares as tuas matrizes, é so correr isso. as ultimas 6 matrizes correspondem a matrizes inter-sbject.
+    #está nessa ordem (Features normal, features com PCA, features com ReliefF, Embedding, embeddings com PCA e embeddings com reliefF)
+    for line in matrix:
+        for distribution in line:
+            print("==================================================")
+            print(distribution/11)
+            print("\n==================================================")
+    
+    
+   
+    
+    
+   
+
     
     
     
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    """
     lista_de_arrays = [
     [np.array([]) for _ in range(7)]  # Linha 1
     for _ in range(4)                 # Repete para 4 linhas (1-> features, 2-> embeddings, 3-> feature selection, 4-> embeddings selection)
@@ -1337,5 +1379,5 @@ if __name__ == "__main__":
     
     significance_test(dados, idx)
     
-
+"""
 
