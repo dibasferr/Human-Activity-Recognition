@@ -19,6 +19,7 @@ from sklearn.metrics import (
 import torch
 from embeddings_extractor import load_model
 from embeddings_extractor import resample_to_30hz_5s
+import seaborn as sns
 
 MAX_REPS= 42
 SWITCH_VALUE=3
@@ -1134,6 +1135,79 @@ def deployment(dados_caracteristicas, dados_deploy):
 
 ###################################################################################################################################################
 
+#FUNÇÕES PARA VISUALIZAR MATRIZES DE CONFUSÃO
+
+def plot_single_confusion_matrix(npy_file, linha, coluna, title=None):
+    """
+    Visualiza uma única matriz de confusão armazenada em um ficheiro .npy.
+    
+    Parâmetros:
+        npy_file (str): Caminho do ficheiro .npy (por exemplo 'matriz_de_fp.npy')
+        linha (int): Linha da matriz (ex: 0 ou 1)
+        coluna (int): Coluna da matriz (ex: 0 a 5)
+        title (str): Título opcional da figura
+    """
+
+    # Carrega o ficheiro
+    matriz = np.load(npy_file, allow_pickle=True)
+
+    # Seleciona a matriz desejada
+    cm = matriz[linha][coluna]
+
+    # Caso o título não tenha sido dado
+    if title is None:
+        title = f"Confusion Matrix (linha={linha}, coluna={coluna})"
+
+    # Plot
+    plt.figure(figsize=(7, 6))
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt=".0f",
+        cmap="Blues",
+        xticklabels=["A1","A2","A3","A4","A5","A6","A7"],
+        yticklabels=["A1","A2","A3","A4","A5","A6","A7"]
+    )
+
+    plt.title(title, fontsize=14)
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.tight_layout()
+    plt.show()
+
+    print("\nMatriz de Confusão (valores brutos):\n")
+    print(cm)
+    
+
+def visualizar_modelo(npy_file, tipo_dataset, tipo_split, tipo_version):
+    """
+    Visualização por descrição textual do modelo.
+    
+    tipo_dataset : 'features' ou 'embeddings'
+    tipo_split   : 'intra' ou 'inter'
+    tipo_version : 'all', 'pca', 'relief'
+    """
+
+    # mapeamento dos modelos para posições [linha][coluna]
+    linha = 0 if tipo_split == "intra" else 1
+
+    mapa_coluna = {
+        ("features",   "all"):   0,
+        ("features",   "pca"):   1,
+        ("features",   "relief"):2,
+        ("embeddings", "all"):   3,
+        ("embeddings", "pca"):   4,
+        ("embeddings", "relief"):5
+    }
+
+    coluna = mapa_coluna[(tipo_dataset, tipo_version)]
+
+    titulo = f"{tipo_dataset.upper()} - {tipo_split.upper()} - {tipo_version.upper()}"
+
+    plot_single_confusion_matrix(npy_file, linha, coluna, titulo)
+
+###################################################################################################################################################
+
 if __name__ == "__main__":
     
     """
@@ -1459,3 +1533,6 @@ if __name__ == "__main__":
     # Identificar o melhor modelo (melhor split, melhor versão (all, pca ou relieff), melhor k)
     resultado = deployment(embeddings, deploy_embeddings)
     print("Atividade prevista: ", resultado)
+    
+    visualizar_modelo("matriz_de_fp.npy", "features", "intra", "pca")
+    visualizar_modelo("matriz_de_fp.npy", "embeddings", "inter", "relief")
