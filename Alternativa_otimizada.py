@@ -1534,5 +1534,5 @@ if __name__ == "__main__":
     resultado = deployment(embeddings, deploy_embeddings)
     print("Atividade prevista: ", resultado)
     
-    visualizar_modelo("matriz_de_fp.npy", "features", "intra", "pca")
-    visualizar_modelo("matriz_de_fp.npy", "embeddings", "inter", "relief")
+    visualizar_modelo("matriz_de_resultados.npy", "features", "intra", "pca")
+    visualizar_modelo("matriz_de_resultados.npy", "embeddings", "inter", "relief")
