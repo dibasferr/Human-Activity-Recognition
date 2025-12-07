@@ -1473,7 +1473,7 @@ if __name__ == "__main__":
     for line in matrix:
         for distribution in line:
             print("==================================================")
-            print(np.round(distribution/11))
+            print(np.round(distribution/10))
             print("\n==================================================")
     
     lista_de_arrays = [
