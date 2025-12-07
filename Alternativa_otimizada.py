@@ -32,7 +32,9 @@ ACELERACAO = 0
 GIROSCOPIO= 1
 MAGNETOMETRO=2
 
-FEATURES= []
+modulos= []
+
+models=[]
 
 ############################################################## META 1 #########################################################################
 
@@ -59,7 +61,7 @@ def descarregar_dados():
 
 #3.1
 def representacao_grafica():
-    modulos_atividades= FEATURES 
+    modulos_atividades= modulos 
     nomes_variaveis = ["Aceleração", "Giroscópio", "Magnetómetro"]
     i=1
     for modulo in modulos_atividades:
@@ -83,7 +85,7 @@ def calculo_modulo(dados):
             dados[condition, j+2].astype(float) **2
             )
             aux.append(modulo)    
-        FEATURES.append(aux) 
+        modulos.append(aux) 
             
     # Nota: o cálculo do módulo dos vetores foi implementado manualmente (x² + y² + z²)^(1/2).
     # Alternativamente, poderíamos usar a função np.linalg.norm(person[condition, 1:4], axis=1). 
@@ -168,9 +170,9 @@ def z_score_test(modulos, k):
 def plot_zscore(K):
     sensores = ["Acelerômetro", "Giroscópio", "Magnetômetro"]
 
-    for i in range(len(FEATURES)):
+    for i in range(len(modulos)):
         plt.figure(num=sensores[i], figsize=(15,6))
-        z_score_test(FEATURES[i], K)
+        z_score_test(modulos[i], K)
 
     plt.show()
  
@@ -187,7 +189,7 @@ def k_means(N):
     dados_transf=[]
     for i in range (1, activity_num):
         
-        dados_a_tratar= np.array(FEATURES[:,i-1])
+        dados_a_tratar= np.array(modulos[:,i-1])
         dados_a_tratar= np.vstack(dados_a_tratar)
         dados_a_tratar= dados_a_tratar.T
         dados_transf.append(dados_a_tratar)
@@ -1019,20 +1021,6 @@ def avaliar_dataset(modelo, y_train, y_val, y_test):
     return resultado_final
 
 
-#pode ser da estrategia intra-subject(0) or inter-subjet(1). 
-#Se for intra-subject o valor será adicionado na primeira linha e se for a inter-subject será adicionada na segunda linha
-"""
-def dados_De_Analise(estrategia): 
-   
-    for i in range(0,7):
-        # para pessoa 1  
-        indx= np.array(7*[True])
-        indx[i]= False
-        fp = np.sum(resultados["metricas_test"]["confusion_matrix"][indx,i])
-        total=  np.sum(resultados["metricas_test"]["confusion_matrix"][indx,:])
-        
-        matriz_de_fp[estrategia][i] = np.append(matriz_de_fp[estrategia][i] , fp/total)
-
 
 def melhor_modelo(distributions):#usa matriz_de_resultados
     #alterar para usar a matriz de accuracy
@@ -1066,7 +1054,7 @@ def melhor_modelo(distributions):#usa matriz_de_resultados
     for i, r in enumerate(mean_ranks, start=1):
         postos_med.append(r)
         
-    return postos_med.index(min(postos_med))
+    return postos_med.index(max(postos_med))
 
 
 def significance_test(distributions, indx_melhor_modelo):
@@ -1085,7 +1073,7 @@ def significance_test(distributions, indx_melhor_modelo):
         else: 
             print(f"{models[indx_melhor_modelo]} não é significativamente melhor que {models[j]} ")
             
-"""    
+   
     
 def deployment(dados_caracteristicas, dados_deploy):
     # Assume-se que o melhor modelo é o Intra-Subject, Embedding com ReliefF
@@ -1132,6 +1120,8 @@ def deployment(dados_caracteristicas, dados_deploy):
 
     return y_deploy_pred
     
+
+
 
 ###################################################################################################################################################
 
@@ -1208,22 +1198,25 @@ def visualizar_modelo(npy_file, tipo_dataset, tipo_split, tipo_version):
 
 ###################################################################################################################################################
 
+
+
 if __name__ == "__main__":
     
-    """
-    ############################################################## META 1 #########################################################################
     
-    """
+    ############################################################## META 1 #########################################################################
     #2
     dadosParticinado = descarregar_dados()
+    """
+
+    
     
     #3.1
     dados = np.vstack(dadosParticinado)
     
-    """
+    
     
     calculo_modulo(dados)
-    FEATURES = np.array(FEATURES, dtype=object)
+    modulos = np.array(modulos, dtype=object)
     
     #representacao_grafica()
     
@@ -1360,6 +1353,7 @@ if __name__ == "__main__":
        
         # 5.1 e 5.2
         # Realizaremos 12 avaliações para 12 modelos diferentes, pois temos 2 datasets (FEATURES e EMBEDDINGS), 2 splits (para cada sujeito, entre sujeitos) e 3 versões (todos os dados originais, dados com PCA aplicado, dados com ReliefF aplicado)
+        #Guarda-se a distribuição da métrica f1_score para se fazer a avaliação do modelo
         
         # 1 - Teste do dataset de FEATURES com split feito em CADA pessoa de TODOS os dados (originais)
         resultados = avaliar_dataset(feat_splits["all"], yf_train, yf_val, yf_test)
@@ -1460,57 +1454,12 @@ if __name__ == "__main__":
     
     np.save("matriz_de_f1Score.npy", matriz_de_resultados) #Guardar em cache
     """
-    matrix=np.load("matriz_de_resultados.npy",allow_pickle=True) #Guardar em cache
-    
-    
-    """
-    matriz_de_fp = np.load("matriz_de_fp.npy", allow_pickle=True)
-    matriz_de_resultados= np.load("matriz_de_resultados.npy", allow_pickle=True)
-    
-=======
-    #Para observares as tuas matrizes, é so correr isso. as ultimas 6 matrizes correspondem a matrizes inter-sbject.
-    #está nessa ordem (Features normal, features com PCA, features com ReliefF, Embedding, embeddings com PCA e embeddings com reliefF)
-    for line in matrix:
-        for distribution in line:
-            print("==================================================")
-            print(np.round(distribution/10))
-            print("\n==================================================")
-    
-    lista_de_arrays = [
-    [np.array([]) for _ in range(7)]  # Linha 1
-    for _ in range(4)                 # Repete para 4 linhas (1-> features, 2-> embeddings, 3-> feature selection, 4-> embeddings selection)
-    ]
-    
-    fp_mean= np.array(lista_de_arrays)
-    
-    for i in range (0,7):
-        
-        for j in range(0,4):
-            
-            fp_mean[j,i]= np.mean(matriz_de_fp[j,i])
-    
-    #fp_mean ira retornar uma matriz com medias de false positives por atividade, 
-    #em que cada linha representa features, embeddings, feature selection e embeddings selection
-    #o que irá permitir concluir quais as atividades mais dificeis de classificar. Irá permitir comparar features e embeddings 
-    #Bem como a relevancia de feature/embeddings selection
-    
-    models= ["FEATURES", "FEATURES PCA", "FEATURES RELIEFF", "EMBEDDINGS", "EMBEDDINGS PCA", "EMBEDDINGS RELIEFF"]
-    
-    #Para a estrategia intra-subject
-    dados= matriz_de_resultados[0,:]
-    dados= np.vstack(dados) # matriz com 6 linhas q representam os 6 modelos
-    
-    idx=melhor_modelo(dados)
-    
-    print(f"==melhor modelo==\n {models[idx]} \n")
-    
-    significance_test(dados, idx)
-    
-    """
-    
+   
+
     # 6. Deployment
     # Pegar o segmento a testar dos dados originais
-    deploy_array = dadosParticinado[0][53120:53376] # 256 primeiras amosrtras do devidce 2 da pessoa 1 
+    data= dadosParticinado[0][53120:53376] # 256 primeiras amosrtras do devidce 2 da pessoa 1 
+    deploy_array = data
     deploy_array = np.array(deploy_array, dtype=float)
     
     acc = deploy_array[:, 1:4]
