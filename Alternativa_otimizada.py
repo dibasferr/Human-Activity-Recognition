@@ -953,7 +953,9 @@ class K_Nearest_Neighbors:
 
 def avaliar_modelo(y_true, y_pred):
     resultados = {}
-
+    y_true = np.asarray(y_true, dtype=int).ravel() 
+    y_pred = np.asarray(y_pred, dtype=int).ravel()
+    
     resultados["confusion_matrix"] = confusion_matrix(y_true, y_pred)
     resultados["accuracy"] = accuracy_score(y_true, y_pred)
     resultados["precision"] = precision_score(y_true, y_pred, average='macro', zero_division=0)
@@ -966,7 +968,7 @@ def avaliar_modelo(y_true, y_pred):
 def escolher_melhor_k(X_train, y_train, X_val, y_val):
     melhor_k = None
     melhor_f1_score = -1
-    
+    metricas= None
     k_testes = [1,3,5,7,9,11,13,15,17,19,21]
     
     for k in k_testes:
@@ -980,6 +982,9 @@ def escolher_melhor_k(X_train, y_train, X_val, y_val):
         if f1_score > melhor_f1_score:
             melhor_f1_score = f1_score
             melhor_k = k
+    
+        print(metricas)
+        print("=======================================")
     
     return melhor_k
 
@@ -1084,26 +1089,22 @@ def previsao(data):
     
     deploy_features = return_features_segment(acc, gyro, mag, pessoa = 1, atividade = 1)
     deploy_features = np.array(deploy_features, dtype=float)
+    deploy_features = deploy_features.reshape(1, -1)
 
-    atividade = 1
-    pessoa = 1
 
-    deploy_features = np.concatenate(
-        [deploy_features, [[atividade, pessoa]]],
-        axis=1
-    )
     
+    print("passed")
     # Identificar o melhor modelo (melhor split, melhor versão (all, pca ou relieff), melhor k)
+    
     resultado = deployment(features, deploy_features)
     print("Atividade prevista: ", resultado)
     
       
     
 def deployment(dados_caracteristicas, dados_deploy):
-    # Assume-se que o melhor modelo é o Intra-Subject, Embedding com ReliefF
     
     # 1 - Treinar o melhor modelo - fazer split
-    X_train, y_train, X_val, y_val, X_test_unused, y_test_unused = split_entre_sujeitos(dados_caracteristicas, 1)
+    X_train, y_train, X_val, y_val, X_test_unused, y_test_unused = split_para_cada_sujeito(dados_caracteristicas, 42)
     
     
     # 2 - Preparar dataset - retorna dados de treino, validção e teste com PCA e ReliefF aplicados (e dados originais)
@@ -1132,10 +1133,11 @@ def deployment(dados_caracteristicas, dados_deploy):
     
     # Remover atividade e pessoa
     X_deploy_base = dados_deploy[:, :-2]
-
+    print(X_deploy_base)
     # Aplicar scaler usado no treino
     X_deploy_norm = scaler_relief.transform(X_deploy_base)
 
+    print(X_deploy_norm)
     # Aplicar seleção de features usada no treino
     X_deploy_sel = X_deploy_norm[:, relief_idx]
 
@@ -1230,10 +1232,10 @@ if __name__ == "__main__":
     ############################################################## META 1 #########################################################################
     #2
     dadosParticinado = descarregar_dados()
-    """
+    
 
     
-    
+    """
     #3.1
     dados = np.vstack(dadosParticinado)
     
@@ -1271,6 +1273,7 @@ if __name__ == "__main__":
     np.save("cache_vetor_features.npy", vetor_features) #Guardar em cache
     
     print("FEATURES GUARDADAS")
+    
 
     #4.3 e 4.4 (PCA)
     PCA_data=aplicar_pca(vetor_features)
@@ -1321,7 +1324,7 @@ if __name__ == "__main__":
     
     """
     #2.1
-    embeddings = retrive_embedding()
+    #embeddings = retrive_embedding()
     """
     
     lista_de_arrays = [
@@ -1484,9 +1487,11 @@ if __name__ == "__main__":
     
     # Pegar o segmento a testar dos dados originais
     features= np.load("cache_vetor_features.npy", allow_pickle=True)
+    print(np.unique(features[:,-2]))
     
-    idx_inicio= 53120
-    idx_fim= 53376
+    
+    idx_inicio= 53120 + 35167
+    idx_fim= idx_inicio + 256
     
     data= dadosParticinado[0][idx_inicio:idx_fim] # 256 primeiras amosrtras do devidce 2 da pessoa 1 
     
