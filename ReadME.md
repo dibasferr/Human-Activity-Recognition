@@ -142,3 +142,19 @@ print(f"==melhor modelo==\n {models[idx]} \n")
 
 # Significancia estatística entre o melhor modelo e o resto
 significance_test(dados, idx)
+
+
+# Como efetuar uma previsão ?
+
+Na secção #6 utilizando dados de samples:
+ # 6. Deployment
+    
+    # Pegar o segmento a testar dos dados originais
+    features= np.load("cache_vetor_features.npy", allow_pickle=True)
+    
+    idx_inicio= #definir indx de inicio
+    idx_fim= #definir indx de fim 
+    
+    data= dadosParticinado[0][idx_inicio:idx_fim] # 256 primeiras amosrtras do devidce 2 da pessoa 1 
+    
+    previsao(data)

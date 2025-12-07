@@ -1485,7 +1485,10 @@ if __name__ == "__main__":
     # Pegar o segmento a testar dos dados originais
     features= np.load("cache_vetor_features.npy", allow_pickle=True)
     
-    data= dadosParticinado[0][53120:53376] # 256 primeiras amosrtras do devidce 2 da pessoa 1 
+    idx_inicio= 53120
+    idx_fim= 53376
+    
+    data= dadosParticinado[0][idx_inicio:idx_fim] # 256 primeiras amosrtras do devidce 2 da pessoa 1 
     
     previsao(data)
     
