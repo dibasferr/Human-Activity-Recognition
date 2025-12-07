@@ -1073,7 +1073,31 @@ def significance_test(distributions, indx_melhor_modelo):
         else: 
             print(f"{models[indx_melhor_modelo]} não é significativamente melhor que {models[j]} ")
             
-   
+ 
+def previsao(data):
+    deploy_array = data
+    deploy_array = np.array(deploy_array, dtype=float)
+    
+    acc = deploy_array[:, 1:4]
+    gyro = deploy_array[:, 4:7]
+    mag = deploy_array[:, 7:10]
+    
+    deploy_features = return_features_segment(acc, gyro, mag, pessoa = 1, atividade = 1)
+    deploy_features = np.array(deploy_features, dtype=float)
+
+    atividade = 1
+    pessoa = 1
+
+    deploy_features = np.concatenate(
+        [deploy_features, [[atividade, pessoa]]],
+        axis=1
+    )
+    
+    # Identificar o melhor modelo (melhor split, melhor versão (all, pca ou relieff), melhor k)
+    resultado = deployment(features, deploy_features)
+    print("Atividade prevista: ", resultado)
+    
+      
     
 def deployment(dados_caracteristicas, dados_deploy):
     # Assume-se que o melhor modelo é o Intra-Subject, Embedding com ReliefF
@@ -1088,7 +1112,7 @@ def deployment(dados_caracteristicas, dados_deploy):
     )
     
     # Extrair modelos usados no treino:
-    X_train_relief, X_val_relief, X_test_relief = splits["relief"]
+    X_train_relief, X_val_relief, X_test_relief = splits["relief"] #trocar por pca, se for o melhor
 
     relief_idx = splits["relief_idx"]
     scaler_relief = splits["scalers"]["relief"]
@@ -1457,31 +1481,11 @@ if __name__ == "__main__":
    
 
     # 6. Deployment
+    
     # Pegar o segmento a testar dos dados originais
+    features= np.load("cache_vetor_features.npy", allow_pickle=True)
+    
     data= dadosParticinado[0][53120:53376] # 256 primeiras amosrtras do devidce 2 da pessoa 1 
-    deploy_array = data
-    deploy_array = np.array(deploy_array, dtype=float)
     
-    acc = deploy_array[:, 1:4]
-    gyro = deploy_array[:, 4:7]
-    mag = deploy_array[:, 7:10]
+    previsao(data)
     
-    deploy_features = return_features_segment(acc, gyro, mag, pessoa = 1, atividade = 1)
-    deploy_features = np.array(deploy_features, dtype=float)
-    
-    deploy_embeddings = retornar_embedding_um_segmento(acc)
-    deploy_embeddings = np.array(deploy_embeddings, dtype=float)
-    atividade = 1
-    pessoa = 1
-
-    deploy_embeddings = np.concatenate(
-        [deploy_embeddings, [[atividade, pessoa]]],
-        axis=1
-    )
-    
-    # Identificar o melhor modelo (melhor split, melhor versão (all, pca ou relieff), melhor k)
-    resultado = deployment(embeddings, deploy_embeddings)
-    print("Atividade prevista: ", resultado)
-    
-    visualizar_modelo("matriz_de_resultados.npy", "features", "intra", "pca")
-    visualizar_modelo("matriz_de_resultados.npy", "embeddings", "inter", "relief")
