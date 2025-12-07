@@ -1,3 +1,7 @@
+# Inicio
+Foi disponibilizado alguns ficheiros .npy para evitar a execução do codigo desde a primeira meta
+
+
 # Como fazer previsao com o melhor modelo ja identificado?
 -> Identificar o codigo no main identificado com #deployment;
 -> disponibilizar os dados para previsao no formato : numpy array 
