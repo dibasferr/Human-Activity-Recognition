@@ -95,7 +95,7 @@ def calculo_modulo(dados):
 def outlier_density(dados):
     #ciclo para o cálculo da densidade das 3 caracteristicas - aceleração, giroscópio e magnetómetro
     for j in range(1, 8, 3):
-        with open("Density_file",'a+') as file:
+        with open("..\data\Density_file",'a+') as file:
             if j == 1 : file.write("\n--- " + "aceleracao ---\n")
             if j == 4 : file.write("\n--- " + "giroscopio ---\n")
             if j == 7 : file.write("\n--- " + "magnetometro ---\n")
@@ -121,7 +121,7 @@ def outlier_density(dados):
             d = (n0/nr)*100
             # -> Fim de calculo
             
-            with open("Density_file",'a+') as file:
+            with open("..\data\Density_file",'a+') as file:
                 file.write("Densidade de outlier do dataset da " + str(i) + " atividade: " + str(d) +"\n")
 
 
@@ -1270,7 +1270,7 @@ if __name__ == "__main__":
     vetor_features = feature_extraction(dadosParticinadoUpdated)
     vetor_features = np.vstack(vetor_features)
     
-    np.save("cache_vetor_features.npy", vetor_features) #Guardar em cache
+    np.save("..\data\cache_vetor_features.npy", vetor_features) #Guardar em cache
     
     print("FEATURES GUARDADAS")
     
@@ -1294,13 +1294,13 @@ if __name__ == "__main__":
     
     dez_melhores_features(pesos,f_scores)
 
-    vetor_features = np.load("cache_vetor_features.npy", allow_pickle=True)
+    vetor_features = np.load("..\data\cache_vetor_features.npy", allow_pickle=True)
     
     
     ############################################################## META 2 #########################################################################
     """
     """
-    vetor_features = np.load("cache_vetor_features.npy", allow_pickle=True)
+    vetor_features = np.load("..\data\cache_vetor_features.npy", allow_pickle=True)
     vetor_features = vetor_features.astype(float)
     
     # 1.1 Balanço entre quantidade de amostras das atividades
@@ -1479,14 +1479,14 @@ if __name__ == "__main__":
         print(f"{i} split done")
     
     
-    np.save("matriz_de_f1Score.npy", matriz_de_resultados) #Guardar em cache
+    np.save("..\data\matriz_de_f1Score.npy", matriz_de_resultados) #Guardar em cache
     """
    
 
     # 6. Deployment
     
     # Pegar o segmento a testar dos dados originais
-    features= np.load("cache_vetor_features.npy", allow_pickle=True)
+    features= np.load("..\data\cache_vetor_features.npy", allow_pickle=True)
     print(np.unique(features[:,-2]))
     
     
