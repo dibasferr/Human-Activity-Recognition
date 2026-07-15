@@ -1,164 +1,45 @@
-# Inicio
-Foi disponibilizado alguns ficheiros .npy para evitar a execução do codigo desde a primeira meta
+# Human Activity Recognition (HAR) using Wearable Sensors
 
+Este repositório contém o projeto de **Classificação de Atividades Humanas** desenvolvido no âmbito da unidade curricular de **Engenharia de Aprendizagem / Extração de Conhecimento a partir de Dados (EA/ECAC)** na **Universidade de Coimbra**.
 
-# Como fazer previsao com o melhor modelo ja identificado?
--> Identificar o codigo no main identificado com #deployment;
--> disponibilizar os dados para previsao no formato : numpy array 
-de formato 256 linhas and 9 colunas (acc x y z, gyr x y z, mag x y z);
--> corra o codigo com  a secção deployment descomentada(só essa secção).
+O objetivo é desenvolver uma pipeline completa de Machine Learning capaz de classificar 7 atividades físicas humanas comuns (como caminhar, correr, subir escadas, etc.) utilizando dados de sensores inerciais (acelerómetro, giroscópio e magnetómetro) de dispositivos vestíveis (wearables).
 
+---
 
+## Visão Geral do Projeto
 
-## Visualizar matrizes de confusão 
-Este conjunto de funções permite visualizar qualquer matriz de confusão produzida durante as 10 repetições dos 12 modelos testados no projeto:
+O projeto aborda o ciclo completo de uma pipeline de Ciência de Dados aplicada a sinais de sensores corporais:
 
-- FEATURES
-- FEATURES PCA
-- FEATURES ReliefF
-- EMBEDDINGS
-- EMBEDDINGS PCA
-- EMBEDDINGS ReliefF
+1. **Pré-processamento & Limpeza de Dados:** Análise exploratória, tratamento de outliers (métodos IQR, Z-Score e K-Means) e cálculo de métricas de densidade de ruído.
+2. **Engenharia de Características (Feature Engineering):**
+   * **Abordagem Clássica (FEATURES):** Extração manual de características estatísticas no domínio do tempo e da frequência (janelas de 5s com 50% de overlap).
+   * **Abordagem de Deep Learning (EMBEDDINGS):** *Transfer Learning* utilizando o modelo pré-treinado **HARNet5** (projeto *ssl-wearables*) aplicado aos dados brutos do acelerómetro.
+3. **Seleção e Redução de Dimensionalidade:** Aplicação de **PCA** (mantendo 90% da variância) e **ReliefF** (seleção das 15 melhores características).
+4. **Validação e Modelação:**
+   * Estratégias de divisão de dados: **Intra-Subject** (avaliação interna) vs. **Inter-Subject** (generalização para novos utilizadores).
+   * Algoritmo de classificação **K-Nearest Neighbors (KNN)** com otimização de hiperparâmetros ($k$).
+   * Testes de hipóteses estatísticas para validação de significância entre modelos.
 
-Com splits:
-- Intra-Subject
-- Inter-Subject
+---
 
+## Como Executar e Fazer Previsões (Deployment)
 
-As matrizes foram salvas em matriz_de_resultados.npy, como soma das matrizes de confusão geradas nas 10 iterações para cada modelo. 
-Fez a soma para depois ser dividida pelo numero de iterações para obter a media das métricas.
+Para testar o melhor modelo identificado no projeto sem ter de reexecutar toda a pipeline de treino, siga estas instruções:
 
--------------------------------------------------------------------------
+1. Localize a secção demarcada com `# 6. Deployment` no ficheiro `src/Alternativa_otimizada.py` (ou no script correspondente).
+2. Descomente **apenas** essa secção do código.
+3. Forneça os dados de entrada para previsão no formato de um **NumPy Array com shape `(256, 9)`** correspondente a:
+   * Colunas: `[acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z, mag_x, mag_y, mag_z]`.
+4. Execute o script. O modelo fará todo o pré-processamento, extração de características e classificação de forma autónoma.
 
-O ficheiro matriz_de_resultados.npy tem o formato:
-- matriz[linha][coluna]
+```python
+# Exemplo de código na secção de Deployment:
+features = np.load("data/cache_vetor_features.npy", allow_pickle=True)
 
-Onde:
+idx_inicio = # Defina o índice de início desejado
+idx_fim    = # Defina o índice de fim desejado
 
-linha:
+# Seleção de um segmento de teste (ex: primeiras 256 amostras do dispositivo 2 do participante 1)
+data = dadosParticionados[0][idx_inicio:idx_fim] 
 
-0 → intra-subject
-1 → inter-subject
-
-coluna:
-
-coluna	    dataset           método <<---------------------------------------------------------------                
-                                                                                                      | 
-  0	        features             all                                                                  |
-  1	        features             PCA                                                                  |
-  2	        features            ReliefF                                                               |
-  3	        embeddings           all                                                                  |
-  4	        embeddings           PCA                                                                  |
-  5	        embeddings          ReliefF                                                               |
-                                                                                                      |
------------------------------------------------------------------------------                         |
-                                                                                                      |
-# Como visualizar uma matriz manualmente ?                                                            |
-                                                                                                      |
-# Setup                                                                                               |
-## Se ainda nao tem a matriz_de_resultados.npy                                                        |
-                                                                                                    
-Adicione esta linha de codigo a seguir a avaliacao de cada modelo:                                    |
-                                                                                                      |
-matrizConfusao[a][b]= matrizConfusao[a][b] + resultados["metricas_test"]["confusion_matrix"]          |
-                                                                                                      |
-a = 0, se for split intra-subject e a = 1, se for inter-subject                                       |
-                                                                                                      |
-o indice b corresponde aos indices especificados na coluna acima -------------------------------------
-
-## Se já tem a matriz_de_resultados.py
-
-Use:
-
-plot_single_confusion_matrix("matriz_de_resultados.npy", linha, coluna)
-
-
-Exemplo:
-➤ plot_single_confusion_matrix("matriz_de_resultados.npy", 0, 2)
-
-
-Mostra:
-intra-subject, features ReliefF
-
-
---------------------------------------------------------------------------------
-
-# Como visualizar uma matriz por descrição do modelo?
-
-Use:
-
-visualizar_modelo(
-    "matriz_de_resultados.npy",
-    tipo_dataset="features" ou "embeddings",
-    tipo_split="intra" ou "inter",
-    tipo_version="all", "pca" ou "relief"
-)
-
-
-Exemplos:
-
-➤ Ver matriz do modelo Embeddings PCA inter-subject
-visualizar_modelo("matriz_de_resultados.npy", "embeddings", "inter", "pca")
-
-➤ Ver matriz do modelo Features ReliefF intra-subject
-visualizar_modelo("matriz_de_resultados.npy", "features", "intra", "relief")
-
-----------------------------------------------------------------------------------
-
-O que aparece?
-
-A função irá:
-
-- Carregar a matriz correta
-- Mostrar um heatmap 7×7
-- Mostrar os valores numéricos no terminal
-
-
-
-## Visualizar o melhor modelo 
-Utilizou-se a mesma abordagem que matriz de confusão, mas neste caso guardou-se a distribuição de f1_score de cada modelo.
-
-## Se ainda nao tem a matriz_de_f1Score.npy                                                        
-                                                                                                    
-Adicione esta linha de codigo a seguir a avaliacao de cada modelo:                                    
-                                                                                                      
-matriz_de_resultados[a][b]= np.append(distribution[a][b], resultados["metricas_test"]["confusion_matrix"])         
-                                                                                                      
-a = 0, se for split intra-subject e a = 1, se for inter-subject                                       
-                                                                                                      
-o indice b corresponde aos indices especificados na coluna acima
-
-
-## Se já tem a matriz_de_f1Score.py
-
-# Setup(adicione essas linhas de codigo)
-models= ["FEATURES", "FEATURES PCA", "FEATURES RELIEFF", "EMBEDDINGS", "EMBEDDINGS PCA", "EMBEDDINGS RELIEFF"]
-    
-matriz= np.load("matriz_de_f1Score.npy", allow_pickle=True)
-
-print(matriz.shape)
-#Para a estrategia intra-subject
-dados= matriz[1,:]
-dados= np.vstack(dados) # matriz com 6 linhas q representam os 6 modelos
-idx=melhor_modelo(dados)
-    
-print(f"==melhor modelo==\n {models[idx]} \n")
-
-# Significancia estatística entre o melhor modelo e o resto
-significance_test(dados, idx)
-
-
-# Como efetuar uma previsão ?
-
-Na secção #6 utilizando dados de samples:
- # 6. Deployment
-    
-    # Pegar o segmento a testar dos dados originais
-    features= np.load("cache_vetor_features.npy", allow_pickle=True)
-    
-    idx_inicio= #definir indx de inicio
-    idx_fim= #definir indx de fim 
-    
-    data= dadosParticinado[0][idx_inicio:idx_fim] # 256 primeiras amosrtras do devidce 2 da pessoa 1 
-    
-    previsao(data)
+previsao(data)
